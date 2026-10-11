@@ -52,6 +52,9 @@ jobs:
           mkdir -p ci-logs
           ./gradlew testDebugUnitTest --stacktrace --continue 2>&1 | tee ci-logs/unit-tests.log
 
+      - name: Check the theme
+        run: python3 tools/check_theme.py
+
       - name: Check the dashboard worker
         run: |
           if command -v node >/dev/null 2>&1; then

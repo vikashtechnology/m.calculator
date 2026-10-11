@@ -74,6 +74,8 @@ private fun KeyButton(
     val useAlt = second && key.altAction != null
     val label = if (useAlt) key.altLabel ?: key.label else key.label
 
+    // Every pair here is (background, text-on-that-background) from the scheme,
+    // so the labels stay readable in both themes.
     val (container, content) = when (key.style) {
         KeyStyle.DIGIT -> colors.surfaceContainerHigh to colors.onSurface
         KeyStyle.OPERATOR -> colors.primaryContainer to colors.onPrimaryContainer
@@ -83,10 +85,11 @@ private fun KeyButton(
         KeyStyle.DANGER -> colors.errorContainer to colors.onErrorContainer
     }
     val activeContainer = if (useAlt && key.style == KeyStyle.FUNCTION) colors.secondaryContainer else container
+    val activeContent = if (useAlt && key.style == KeyStyle.FUNCTION) colors.onSecondaryContainer else content
 
     Surface(
         color = activeContainer,
-        contentColor = content,
+        contentColor = activeContent,
         shape = RoundedCornerShape(16.dp),
         tonalElevation = if (key.style == KeyStyle.FUNCTION) 0.dp else 2.dp,
         // A soft shadow makes the keys read as physical buttons in both themes.
@@ -113,13 +116,15 @@ private fun KeyButton(
                 maxLines = 1
             )
             if (!second && key.altLabel != null && key.style == KeyStyle.FUNCTION) {
+                // Sits in the corner of a function key. `onSurfaceVariant` is the
+                // readable-on-any-surface role; the key's own tint at 55% was not.
                 Text(
                     text = key.altLabel,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                    color = content.copy(alpha = 0.55f),
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    color = colors.onSurfaceVariant,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 3.dp, end = 5.dp)
+                        .padding(top = 2.dp, end = 4.dp)
                 )
             }
         }

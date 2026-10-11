@@ -139,7 +139,7 @@ fun DisplayPanel(
                         fontFamily = FontFamily.Monospace,
                         fontSize = 28.sp
                     ),
-                    color = colors.onSurfaceVariant.copy(alpha = 0.4f),
+                    color = colors.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier
                         .align(Alignment.CenterStart)
                         .padding(vertical = 8.dp)
@@ -189,7 +189,7 @@ fun DisplayPanel(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 16.sp
                 ),
-                color = colors.secondary,
+                color = colors.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.End,

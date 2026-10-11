@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.advanceai.calculator.ui.theme.appChipColors
 import com.advanceai.calculator.engine.Formatter
 import com.advanceai.calculator.engine.UnitCategory
 import com.advanceai.calculator.engine.Units
@@ -66,6 +67,7 @@ fun ConverterScreen(
         ) {
             UnitCategory.entries.forEach { category ->
                 FilterChip(
+                    colors = appChipColors(),
                     selected = state.category == category,
                     onClick = { viewModel.setConverterCategory(category) },
                     label = { Text(category.label) }
@@ -237,6 +239,7 @@ private fun UnitPicker(
                             maxLines = 1
                         )
                     },
+                    colors = appChipColors(),
                     modifier = Modifier.width(150.dp)
                 )
             }

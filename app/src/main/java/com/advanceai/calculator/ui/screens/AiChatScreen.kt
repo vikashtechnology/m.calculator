@@ -649,9 +649,12 @@ private fun ChatComposer(
                     placeholder = { Text("Ask a maths question…") },
                     maxLines = 4,
                     shape = RoundedCornerShape(20.dp),
+                    // `outline` (not `outlineVariant`) for the resting border: on
+                    // the light panel the hairline variant was invisible, so the
+                    // field looked like plain text until it was focused.
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = colors.primary,
-                        unfocusedBorderColor = colors.outlineVariant
+                        unfocusedBorderColor = colors.outline
                     ),
                     modifier = Modifier
                         .weight(1f)

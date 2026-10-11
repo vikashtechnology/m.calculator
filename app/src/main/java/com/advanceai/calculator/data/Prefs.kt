@@ -6,6 +6,18 @@ import com.advanceai.calculator.engine.AngleMode
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** Which palette the app paints, chosen in the drop-down menu. */
+enum class AppThemeMode(val label: String) {
+    SYSTEM("System"),
+    LIGHT("Light"),
+    DARK("Dark");
+
+    companion object {
+        fun from(value: String?): AppThemeMode =
+            entries.firstOrNull { it.name == value } ?: SYSTEM
+    }
+}
+
 data class HistoryEntry(
     val expression: String,
     val result: String,
@@ -44,6 +56,11 @@ class Prefs(context: Context) {
     var precision: Int
         get() = sp.getInt(KEY_PRECISION, 12)
         set(value) = sp.edit { putInt(KEY_PRECISION, value) }
+
+    /** System / Light / Dark — see [AppThemeMode]. */
+    var themeMode: AppThemeMode
+        get() = AppThemeMode.from(sp.getString(KEY_THEME, null))
+        set(value) = sp.edit { putString(KEY_THEME, value.name) }
 
     fun loadVariables(): MutableMap<String, Double> {
         val map = LinkedHashMap<String, Double>()
@@ -106,6 +123,7 @@ class Prefs(context: Context) {
         const val KEY_VARIABLES = "variables"
         const val KEY_HISTORY = "history"
         const val KEY_PRECISION = "precision"
+        const val KEY_THEME = "theme_mode"
         const val MAX_HISTORY = 200
     }
 }

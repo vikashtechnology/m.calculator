@@ -13,7 +13,6 @@ import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -33,6 +32,7 @@ import com.advanceai.calculator.ui.CalculatorViewModel
 import com.advanceai.calculator.ui.components.AiHeroCard
 import com.advanceai.calculator.ui.components.DisplayPanel
 import com.advanceai.calculator.ui.components.Keypad
+import com.advanceai.calculator.ui.theme.appChipColors
 import com.advanceai.calculator.ui.HelpSheet
 import com.advanceai.calculator.ui.HistorySheet
 import com.advanceai.calculator.ui.KeyAction
@@ -96,7 +96,7 @@ fun PadScreen(
                     selected = state.page == page,
                     onClick = { viewModel.setPage(page) },
                     label = { Text(page.label) },
-                    colors = FilterChipDefaults.filterChipColors()
+                    colors = appChipColors()
                 )
             }
             FilterChip(
@@ -110,10 +110,7 @@ fun PadScreen(
                         modifier = Modifier.size(16.dp)
                     )
                 },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                )
+                colors = appChipColors()
             )
         }
 

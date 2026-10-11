@@ -228,28 +228,46 @@ rules as `Formatter`.
 
 ```bash
 python3 tools/make_icons.py               # redraw the launcher icons
-python3 tools/make_icons.py --concepts    # compare the three styles
+python3 tools/check_theme.py              # palette + contrast audit
 python3 tools/reference.py                # print expected values for the tests
 ```
 
 ## The launcher icon
 
-The icon is drawn in code — `tools/make_icons.py` is Pillow-only (the build
-environment has no SVG rasteriser), so the same geometry renders at every
-density: a violet gradient tile with a white calculator, a violet display, nine
-lavender keys and the `=` key in the brand violet.
+The icon is drawn in code: `tools/make_icons.py` is Pillow-only (the build
+environment has no SVG rasteriser), and every shape is written in the
+coordinates of the source artwork's own 640-unit viewBox, so one shape set
+renders from 48 px up to 512 px without redrawing anything.
 
 ```bash
-python3 tools/make_icons.py                     # style "card" — the shipping icon
-python3 tools/make_icons.py --style outline     # line-art alternative
-python3 tools/make_icons.py --style glyph       # display and keys only
+python3 tools/make_icons.py        # writes the icons and the preview sheets
 ```
 
-Each run writes `ic_launcher`, `ic_launcher_round`, the adaptive background,
-foreground and monochrome layers for all five densities, `assets/play-store-icon-512.png`
-and `assets/app-icon-preview.png` (the sheet that shows the icon, the launcher
-masks, every size and a home screen). `assets/icon-styles.png` compares the three
-styles side by side.
+A run writes, for each density, `ic_launcher`, `ic_launcher_round`, the adaptive
+background, foreground and monochrome layers, plus
+`assets/play-store-icon-512.png`, `assets/app-icon-preview.png` (the sheet that
+shows the icon, the launcher masks, every size and a home screen) and
+`assets/icon-layers.png` (each Android layer on its own). The adaptive
+foreground and the monochrome glyph are scaled to 0.80 and 0.90 so that the AI
+badge survives a circular mask; `assets/app-icon.svg` is the source the drawing
+follows, kept for reference.
+
+## Colours and themes
+
+The palette lives entirely in `ui/theme/Theme.kt` — both the dark and the light
+scheme define every Material role, plus the chart colours Material has no slot
+for. Screens read roles (`onSurfaceVariant`, `primaryContainer`, …) and never
+paint a raw colour, which is what keeps the text readable when the theme flips.
+The **Appearance** switch in the drop-down menu picks System, Light or Dark, and
+the window's status-bar icons follow that choice rather than the phone's.
+
+```bash
+python3 tools/check_theme.py      # no stray colours, both palettes complete, contrast measured
+```
+
+The check fails the build when a colour appears outside the theme file, when the
+two palettes drift apart, or when any (text, background) pair the screens use
+drops under 4.5:1 for body text / 3:1 for large text and plot strokes.
 
 ## Continuous integration
 

@@ -49,6 +49,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.advanceai.calculator.ui.theme.chartColors
 import com.advanceai.calculator.engine.CalculatorEngine
 import com.advanceai.calculator.engine.Calculus
 import com.advanceai.calculator.engine.Evaluator
@@ -64,13 +65,20 @@ import kotlin.math.floor
 import kotlin.math.log10
 import kotlin.math.pow
 
-private val curveColors = listOf(
-    Color(0xFF7C6CFF),
-    Color(0xFF35C2F0),
-    Color(0xFF3FD08B),
-    Color(0xFFF0A93B),
-    Color(0xFFE05FA8)
-)
+/**
+ * The colours the plot draws with. Everything is derived from the theme, so the
+ * grid, the axes and the labels stay readable on white as well as on the dark
+ * surface — the old fixed white-on-white values are what made the graph look
+ * blank in the light theme.
+ */
+private data class PlotColors(
+    val series: List<Color>,
+    val grid: Color,
+    val axis: Color,
+    val label: TextStyle
+) {
+    fun seriesAt(index: Int): Color = series[index % series.size]
+}
 
 @Composable
 fun GraphScreen(
@@ -80,6 +88,17 @@ fun GraphScreen(
 ) {
     val graph = viewModel.graph
     val textMeasurer = rememberTextMeasurer()
+    val scheme = MaterialTheme.colorScheme
+    val plot = PlotColors(
+        series = chartColors,
+        grid = scheme.onSurface.copy(alpha = 0.12f),
+        axis = scheme.onSurface.copy(alpha = 0.42f),
+        label = TextStyle(
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            color = scheme.onSurfaceVariant
+        )
+    )
     val parsed = remember(graph.functions) {
         graph.functions.map { fn -> runCatching { CalculatorEngine.parse(fn.expression) }.getOrNull() }
     }
@@ -145,7 +164,7 @@ fun GraphScreen(
                         }
                     }
             ) {
-                drawPlot(graph, parsed, ctx, textMeasurer)
+                drawPlot(graph, parsed, ctx, textMeasurer, plot)
             }
 
             val traceX = graph.traceX
@@ -168,7 +187,7 @@ fun GraphScreen(
                         modifier = Modifier
                             .size(14.dp)
                             .background(
-                                color = if (fn.visible) curveColors[fn.colorIndex % curveColors.size]
+                                color = if (fn.visible) plot.seriesAt(fn.colorIndex)
                                 else MaterialTheme.colorScheme.outline,
                                 shape = CircleShape
                             )
@@ -216,6 +235,7 @@ private fun BoxScope.TraceChip(
     ctx: MathContext,
     x: Double
 ) {
+    val series = chartColors
     val values = graph.functions.mapIndexedNotNull { index, fn ->
         if (!fn.visible) return@mapIndexedNotNull null
         val expr = parsed.getOrNull(index) ?: return@mapIndexedNotNull null
@@ -247,7 +267,7 @@ private fun BoxScope.TraceChip(
                 Text(
                     text = "y${index + 1} = $text",
                     style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
-                    color = curveColors[index % curveColors.size]
+                    color = series[index % series.size]
                 )
             }
         }
@@ -258,7 +278,8 @@ private fun DrawScope.drawPlot(
     graph: GraphState,
     parsed: List<Expr?>,
     ctx: MathContext,
-    textMeasurer: TextMeasurer
+    textMeasurer: TextMeasurer,
+    plot: PlotColors
 ) {
     val width = size.width
     val height = size.height
@@ -270,9 +291,9 @@ private fun DrawScope.drawPlot(
     fun xToPx(x: Double): Float = ((x - graph.xMin) / xSpan * width).toFloat()
     fun yToPx(y: Double): Float = ((graph.yMax - y) / ySpan * height).toFloat()
 
-    val gridColor = Color(0x22FFFFFF)
-    val axisColor = Color(0x88FFFFFF)
-    val labelStyle = TextStyle(fontSize = 10.sp, fontFamily = FontFamily.Monospace, color = Color(0x99AEB4CC))
+    val gridColor = plot.grid
+    val axisColor = plot.axis
+    val labelStyle = plot.label
 
     // --- grid ---------------------------------------------------------------
     val xStep = niceStep(xSpan / 8)
@@ -362,7 +383,7 @@ private fun DrawScope.drawPlot(
         }
         drawPath(
             path = path,
-            color = curveColors[fn.colorIndex % curveColors.size],
+            color = plot.seriesAt(fn.colorIndex),
             style = Stroke(width = 3f)
         )
     }
@@ -371,7 +392,7 @@ private fun DrawScope.drawPlot(
     val traceX = graph.traceX
     if (traceX != null && traceX in graph.xMin..graph.xMax) {
         val px = xToPx(traceX)
-        drawLine(Color(0x66FFFFFF), Offset(px, 0f), Offset(px, height), strokeWidth = 2f)
+        drawLine(plot.axis.copy(alpha = 0.7f), Offset(px, 0f), Offset(px, height), strokeWidth = 2f)
     }
 }
 

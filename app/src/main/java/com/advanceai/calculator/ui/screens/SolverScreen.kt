@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.text.KeyboardOptions
+import com.advanceai.calculator.ui.theme.appChipColors
 import com.advanceai.calculator.ui.CalculatorViewModel
 import com.advanceai.calculator.ui.SolverMode
 
@@ -48,6 +49,7 @@ fun SolverScreen(
         ) {
             SolverMode.entries.forEach { entry ->
                 FilterChip(
+                    colors = appChipColors(),
                     selected = entry == mode,
                     onClick = {
                         viewModel.updateSolver {

@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.advanceai.calculator.ui.theme.appChipColors
 import com.advanceai.calculator.ui.CalculatorViewModel
 import com.advanceai.calculator.ui.MatrixOp
 import com.advanceai.calculator.ui.MatrixState
@@ -59,6 +60,7 @@ fun MatrixScreen(
         ) {
             MatrixOp.entries.forEach { op ->
                 FilterChip(
+                    colors = appChipColors(),
                     selected = state.operation == op,
                     onClick = { viewModel.updateMatrix { it.copy(operation = op, result = "", error = null) } },
                     label = { Text(op.label) }
@@ -73,11 +75,13 @@ fun MatrixScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             FilterChip(
+                colors = appChipColors(),
                 selected = state.editingA,
                 onClick = { viewModel.updateMatrix { it.copy(editingA = true, selectedCell = -1) } },
                 label = { Text("Matrix A (${state.rowsA}×${state.colsA})") }
             )
             FilterChip(
+                colors = appChipColors(),
                 selected = !state.editingA,
                 onClick = { viewModel.updateMatrix { it.copy(editingA = false, selectedCell = -1) } },
                 label = { Text("Matrix B (${state.rowsB}×${state.colsB})") }

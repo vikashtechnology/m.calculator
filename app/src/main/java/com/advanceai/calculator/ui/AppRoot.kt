@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,19 +62,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.advanceai.calculator.ui.components.AiHeroMenuRow
+import com.advanceai.calculator.ui.theme.appChipColors
 import com.advanceai.calculator.ui.screens.AiChatScreen
 import com.advanceai.calculator.ui.screens.ConverterScreen
 import com.advanceai.calculator.ui.screens.GraphScreen
 import com.advanceai.calculator.ui.screens.MatrixScreen
 import com.advanceai.calculator.ui.screens.PadScreen
 import com.advanceai.calculator.ui.screens.SolverScreen
+import com.advanceai.calculator.data.AppThemeMode
 import com.advanceai.calculator.data.Telemetry
 import com.advanceai.calculator.ui.screens.EverydayTool
 import com.advanceai.calculator.ui.screens.StatsScreen
@@ -96,8 +98,13 @@ private const val ItemsPerLine = 2
 private const val ToolsPerLine = 3
 
 @Composable
-fun AppRoot(viewModel: CalculatorViewModel) {
+fun AppRoot(
+    viewModel: CalculatorViewModel,
+    themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    onThemeModeChange: (AppThemeMode) -> Unit = {}
+) {
     val context = LocalContext.current
+    val colors = MaterialTheme.colorScheme
     var tab by remember { mutableStateOf(AppTab.CALC) }
     var menuOpen by remember { mutableStateOf(false) }
     var aiOpen by remember { mutableStateOf(false) }
@@ -187,7 +194,7 @@ fun AppRoot(viewModel: CalculatorViewModel) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.45f))
+                            .background(colors.scrim.copy(alpha = 0.45f))
                             .clickable(
                                 indication = null,
                                 interactionSource = remember { MutableInteractionSource() }
@@ -228,6 +235,8 @@ fun AppRoot(viewModel: CalculatorViewModel) {
                         statsOn = enabled
                         Telemetry.setEnabled(context, enabled)
                     },
+                    themeMode = themeMode,
+                    onThemeModeChange = onThemeModeChange,
                     onClose = { menuOpen = false }
                 )
             }
@@ -300,6 +309,8 @@ private fun DropDownMenuPanel(
     onOpenTool: (EverydayTool) -> Unit,
     statsOn: Boolean,
     onStatsChange: (Boolean) -> Unit,
+    themeMode: AppThemeMode,
+    onThemeModeChange: (AppThemeMode) -> Unit,
     onClose: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -390,6 +401,27 @@ private fun DropDownMenuPanel(
                     repeat(ToolsPerLine - line.size) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
+                }
+            }
+
+            // --- appearance --------------------------------------------------
+            Text(
+                text = "Appearance",
+                style = MaterialTheme.typography.labelLarge,
+                color = colors.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp, top = 14.dp, bottom = 2.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AppThemeMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = mode == themeMode,
+                        onClick = { onThemeModeChange(mode) },
+                        label = { Text(mode.label) },
+                        colors = appChipColors()
+                    )
                 }
             }
 

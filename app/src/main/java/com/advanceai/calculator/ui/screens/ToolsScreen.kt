@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.advanceai.calculator.ui.theme.appChipColors
 import com.advanceai.calculator.engine.Everyday
 import com.advanceai.calculator.engine.Formatter
 import com.advanceai.calculator.engine.MathError
@@ -65,6 +66,7 @@ fun ToolsScreen(
         ) {
             EverydayTool.entries.forEach { entry ->
                 FilterChip(
+                    colors = appChipColors(),
                     selected = entry == tool,
                     onClick = { onSelectTool(entry) },
                     label = { Text(entry.label) }
@@ -245,6 +247,7 @@ private fun GstTool() {
         ) {
             listOf("5", "12", "18", "28").forEach { preset ->
                 FilterChip(
+                    colors = appChipColors(),
                     selected = rate == preset,
                     onClick = { rate = preset },
                     label = { Text("$preset%") }
@@ -287,6 +290,7 @@ private fun TaxTool() {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Everyday.TaxRegime.entries.forEach { entry ->
                 FilterChip(
+                    colors = appChipColors(),
                     selected = regime == entry,
                     onClick = { regime = entry },
                     label = { Text(entry.label) }
@@ -546,6 +550,7 @@ private fun InterestTool() {
             listOf("1" to "Yearly", "2" to "Half-yearly", "4" to "Quarterly", "12" to "Monthly")
                 .forEach { (value, label) ->
                     FilterChip(
+                        colors = appChipColors(),
                         selected = perYear == value,
                         onClick = { perYear = value },
                         label = { Text(label) }
@@ -727,6 +732,7 @@ private fun BasesTool() {
         ) {
             listOf("2", "8", "10", "16", "36").forEach { base ->
                 FilterChip(
+                    colors = appChipColors(),
                     selected = toBase == base,
                     onClick = { toBase = base },
                     label = { Text("base $base") }

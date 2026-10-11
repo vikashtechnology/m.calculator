@@ -43,7 +43,13 @@ fun HistorySheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val clipboard = LocalClipboardManager.current
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)
+    ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),

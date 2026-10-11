@@ -23,7 +23,13 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun HelpSheet(onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        scrimColor = MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
