@@ -3,6 +3,7 @@ package com.advanceai.calculator.ui.theme
 import android.app.Activity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.SelectableChipColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
@@ -205,13 +206,22 @@ fun MCalculatorTheme(
         }
     }
 
+    val scheme = if (dark) DarkColors else LightColors
     CompositionLocalProvider(
         LocalAppColors provides if (dark) DarkAppColors else LightAppColors
     ) {
         MaterialTheme(
-            colorScheme = if (dark) DarkColors else LightColors,
-            typography = AppTypography,
-            content = content
-        )
+            colorScheme = scheme,
+            typography = AppTypography
+        ) {
+            // Material only sets this inside a Surface, so at the app root it
+            // would default to black — invisible on the dark theme. Everything
+            // that does not pick a colour of its own (the graph toolbar icons,
+            // for instance) now follows the theme instead.
+            CompositionLocalProvider(
+                LocalContentColor provides scheme.onBackground,
+                content = content
+            )
+        }
     }
 }

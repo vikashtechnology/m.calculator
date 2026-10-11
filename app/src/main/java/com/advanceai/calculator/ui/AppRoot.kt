@@ -110,11 +110,19 @@ private val TopBarHeight = 56.dp
 
 /**
  * Room the calculator pad needs before an ad may take a slice of the screen:
- * about 330dp for the hero card, the readout and the page chips, plus about
- * 240dp so five rows of keys stay comfortably tappable. Screens that cannot
- * offer this (small phones, split screen) simply show no ad.
+ * about 250dp for the readout and the page chips, plus about 220dp so five
+ * rows of keys stay comfortably tappable, plus the banner slot itself. Screens
+ * that cannot offer this (small phones, split screen) simply show no ad.
  */
-private val MinContentHeightForAds = 630.dp
+private val MinContentHeightForAds = 560.dp
+
+/**
+ * The banner slot: one 320×50 ad plus the gap above it. The slot is reserved
+ * for the whole life of the screen, whether or not an ad turns up, so the keys
+ * above it never change size when an ad loads.
+ */
+private val AdSlotHeight = 50.dp
+private val AdSlotGap = 6.dp
 
 @Composable
 fun AppRoot(
@@ -163,10 +171,10 @@ fun AppRoot(
                 .windowInsetsPadding(WindowInsets.safeDrawing)
         ) {
             // The ad slot only opens when the screen has room to spare: the
-            // calculator pad needs roughly [MinContentHeightForAds] for its hero,
-            // readout, page chips and keys, and a banner adds about 90dp on top of
-            // that. Short screens and split-screen windows simply get no ad, so the
-            // keypad can never be squeezed into something untappable.
+            // calculator pad needs its readout, page chips and five tappable
+            // rows of keys, and the threshold covers all of that plus the
+            // banner. Short screens and split-screen windows simply get no ad,
+            // so the keypad can never be squeezed into something untappable.
             val showAdSlot =
                 adsPossible && maxHeight >= TopBarHeight + MinContentHeightForAds
 
@@ -232,15 +240,20 @@ fun AppRoot(
                     )
                 }
 
-                // The AdMob banner, pinned under everything else. It draws nothing
-                // of its own until an ad actually arrives, so this line costs no
-                // space when there is no fill.
+                // The AdMob banner, pinned under everything else. Its height is
+                // reserved from the first frame — the keys are laid out with
+                // this space already gone — so an ad appearing can never resize
+                // the keypad. If no ad arrives the slot simply stays empty.
                 if (showAdSlot) {
-                    AdBanner(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 6.dp)
-                    )
+                            .padding(top = AdSlotGap)
+                            .height(AdSlotHeight),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AdBanner()
+                    }
                 }
             }
 

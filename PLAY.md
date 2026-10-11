@@ -314,9 +314,10 @@ in *App content → Ads*: answer "Yes, my app contains ads".
   the manifest with `required="false"`, so tablets without a camera still work.
 * If you also want the APK for phones beside the bundle, it is on the same
   release; Play itself only takes the `.aab`.
-* The banner is only laid out on screens with room to spare (about 630dp of
-  content, which covers ordinary phones); on a small screen or in split screen
-  no ad is requested at all, so the keypad can never be squeezed.
+* The banner is a fixed 320×50 ad in a slot that is reserved from the first
+  frame, so an ad arriving never resizes the keypad. The slot only opens on
+  screens with room to spare (about 560dp of content, which covers ordinary
+  phones); on a small screen or in split screen no ad is requested at all.
 * Ad revenue and the wording of the listing have to move together: the store
   text, the data-safety answers and the privacy policy all say the app carries
   ads now.

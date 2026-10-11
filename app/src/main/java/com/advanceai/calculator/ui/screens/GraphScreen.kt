@@ -112,23 +112,39 @@ fun GraphScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = { viewModel.addGraphFunction() }) {
-                Icon(Icons.Filled.Add, contentDescription = "Add a function")
+                Icon(
+                    imageVector = Icons.Filled.Add,
+                    contentDescription = "Add a function",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
             IconButton(onClick = {
                 viewModel.zoomGraph(1.5f, (graph.xMin + graph.xMax) / 2, (graph.yMin + graph.yMax) / 2)
             }) {
-                Icon(Icons.Filled.ZoomIn, contentDescription = "Zoom in")
+                Icon(
+                    imageVector = Icons.Filled.ZoomIn,
+                    contentDescription = "Zoom in",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
             IconButton(onClick = {
                 viewModel.zoomGraph(1f / 1.5f, (graph.xMin + graph.xMax) / 2, (graph.yMin + graph.yMax) / 2)
             }) {
-                Icon(Icons.Filled.ZoomOut, contentDescription = "Zoom out")
+                Icon(
+                    imageVector = Icons.Filled.ZoomOut,
+                    contentDescription = "Zoom out",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
             IconButton(onClick = {
                 viewModel.resetGraphWindow()
                 viewModel.setTraceX(null)
             }) {
-                Icon(Icons.Filled.CenterFocusStrong, contentDescription = "Reset the view")
+                Icon(
+                    imageVector = Icons.Filled.CenterFocusStrong,
+                    contentDescription = "Reset the view",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
             Text(
                 text = "x ∈ [${Formatter.number(graph.xMin)}, ${Formatter.number(graph.xMax)}]",
@@ -206,6 +222,7 @@ fun GraphScreen(
                         Icon(
                             imageVector = if (fn.visible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
                             contentDescription = "Show or hide",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -213,6 +230,7 @@ fun GraphScreen(
                         Icon(
                             imageVector = Icons.Filled.Delete,
                             contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.error,
                             modifier = Modifier.size(20.dp)
                         )
                     }

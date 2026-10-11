@@ -17,6 +17,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lightbulb
@@ -60,6 +61,7 @@ fun DisplayPanel(
     onCycleAngle: () -> Unit,
     onTogglePolar: () -> Unit,
     onHistory: () -> Unit,
+    onOpenAi: () -> Unit,
     onCopy: () -> Unit,
     onClearEntry: () -> Unit,
     onHint: () -> Unit,
@@ -122,6 +124,15 @@ fun DisplayPanel(
                     imageVector = Icons.Filled.History,
                     contentDescription = "History",
                     tint = colors.onSurfaceVariant
+                )
+            }
+            // Ask AI lives here now, beside the history button, instead of
+            // taking a card of its own above the keypad.
+            IconButton(onClick = onOpenAi) {
+                Icon(
+                    imageVector = Icons.Filled.AutoAwesome,
+                    contentDescription = "Ask AI",
+                    tint = colors.primary
                 )
             }
         }

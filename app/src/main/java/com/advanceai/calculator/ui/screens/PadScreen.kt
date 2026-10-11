@@ -29,7 +29,6 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.advanceai.calculator.ui.CalcKey
 import com.advanceai.calculator.ui.CalculatorViewModel
-import com.advanceai.calculator.ui.components.AiHeroCard
 import com.advanceai.calculator.ui.components.DisplayPanel
 import com.advanceai.calculator.ui.components.Keypad
 import com.advanceai.calculator.ui.theme.appChipColors
@@ -51,10 +50,9 @@ fun PadScreen(
     var showHelp by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize()) {
-        // Hero section: the AI entry point sits at the very top of the pad.
-        AiHeroCard(onOpenAi = onOpenAi)
-
         // The readout sits on its own raised card, which gives the pad depth.
+        // Ask AI is an icon in its toolbar now (next to history), which keeps
+        // the whole pad shorter and leaves the keys more room.
         Surface(
             color = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(20.dp),
@@ -71,6 +69,7 @@ fun PadScreen(
             onCycleAngle = { viewModel.cycleAngleMode() },
             onTogglePolar = { viewModel.setPolar(!state.polar) },
             onHistory = { showHistory = true },
+            onOpenAi = onOpenAi,
             onCopy = {
                 val text = state.resultText.ifEmpty { state.expression }
                 if (text.isNotEmpty()) {

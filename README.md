@@ -102,7 +102,8 @@ between them. Every field recalculates as you type — there is no Solve button.
 | **Age** | Age in years/months/days plus total days/weeks/months and days to the next birthday |
 
 ### Ask AI (bring your own key — nothing to sign up for)
-The hero card at the top of the pad opens **Ask AI**, a chat:
+The **Ask AI** icon in the readout's toolbar (beside the history button) opens
+a chat:
 
 * **type** a question, **photograph** it with the in-app camera, or **attach** a
   photo, PDF or text file — then send

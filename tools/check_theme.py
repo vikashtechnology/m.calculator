@@ -148,6 +148,41 @@ def chart_colours() -> dict[str, list[str]]:
         out[name] = re.findall(r"Color\(\s*0xFF([0-9A-Fa-f]{6})\s*\)", match.group(1))
     return out
 
+def untinted_icon_count() -> int:
+    """Icons with no tint of their own follow LocalContentColor."""
+    count = 0
+    for path in sorted(SOURCES.rglob("*.kt")):
+        body = path.read_text()
+        for match in re.finditer(r"\bIcon\(", body):
+            depth, index = 0, match.end() - 1
+            while index < len(body):
+                if body[index] == "(":
+                    depth += 1
+                elif body[index] == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                index += 1
+            if "tint =" not in body[match.end() - 1:index]:
+                count += 1
+    return count
+
+
+def check_content_colour() -> list[str]:
+    """Untinted icons (the graph toolbar was one) draw in LocalContentColor,
+    which Material only sets inside a Surface — at the app root it is black,
+    which is invisible on the dark theme. The theme has to set it."""
+    text = THEME.read_text()
+    if "LocalContentColor provides" not in text:
+        return [
+            "  " + str(THEME.relative_to(ROOT)) + ": the theme never provides"
+            " LocalContentColor, so every untinted icon and label falls back to"
+            " black — invisible against the dark background",
+        ]
+    print(f"    ok     theme supplies a default content colour"
+          f" ({untinted_icon_count()} icons rely on it)\n")
+    return []
+
 
 def main() -> int:
     problems: list[str] = []
@@ -159,6 +194,9 @@ def main() -> int:
 
     schemes = parse_schemes()
     problems += check_schemes(schemes)
+
+    print("Fallbacks — what things without a colour of their own draw in\n  theme")
+    problems += check_content_colour()
 
     print("Contrast — text and strokes against the surface they are drawn on\n")
     failures = 0
