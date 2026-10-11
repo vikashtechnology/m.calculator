@@ -193,12 +193,13 @@ The banner is real AdMob code. Whether it serves a test ad or a paid one depends
 on the two IDs the build is given, and they come from `gradle.properties`:
 
 ```properties
-admobAppId=ca-app-pub-xxxxxxxxxxxxxxxx~yyyyyyyyyy
-admobBannerUnitId=ca-app-pub-xxxxxxxxxxxxxxxx/zzzzzzzzzz
+admobAppId=ca-app-pub-7016837191893767~7695145778
+admobBannerUnitId=ca-app-pub-7016837191893767/4338354697
 ```
 
-Both fall back to **Google's public test units** when they are not set, which is
-why a build straight off CI shows a "Test Ad" banner and earns nothing.
+Both are set in `gradle.properties` for this app, so every build CI produces
+carries the real units. Remove the two lines and the build falls back to
+**Google's public test units** — a "Test Ad" banner that earns nothing.
 
 * Get the real pair from <https://admob.google.com> → **Apps → Add app**
   (the app ID, with the `~`) and **Ad units → Banner** (the unit ID, with the
