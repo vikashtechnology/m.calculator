@@ -1,34 +1,40 @@
 package com.vikashtechnology.mcalculator.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.Icons
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -41,10 +47,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vikashtechnology.mcalculator.ui.screens.ConverterScreen
@@ -64,51 +71,40 @@ enum class AppTab(val label: String, val icon: ImageVector) {
     STATS("Stats", Icons.Filled.BarChart)
 }
 
-/** Width of the left navigation sidebar. */
-private val SidebarWidth = 104.dp
-
-/** How many items each line of the sidebar holds: 6 tabs become 3 lines of 2. */
+/** How many tiles each line of the drop-down holds: 6 tabs become 3 lines of 2. */
 private const val ItemsPerLine = 2
 
 @Composable
 fun AppRoot(viewModel: CalculatorViewModel) {
     var tab by remember { mutableStateOf(AppTab.CALC) }
+    var menuOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val showMessage: (String) -> Unit = { message ->
         scope.launch { snackbarHostState.showSnackbar(message) }
     }
 
-    BackHandler(enabled = tab != AppTab.CALC) { tab = AppTab.CALC }
+    // Back closes the drop-down first, then returns to the calculator.
+    BackHandler(enabled = menuOpen || tab != AppTab.CALC) {
+        if (menuOpen) menuOpen = false else tab = AppTab.CALC
+    }
 
-    Surface(
-        color = MaterialTheme.colorScheme.background,
-        modifier = Modifier.fillMaxSize()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        Row(modifier = Modifier.fillMaxSize()) {
-            AppSidebar(
-                selected = tab,
-                onSelect = { tab = it },
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(SidebarWidth)
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(
-                            WindowInsetsSides.Start + WindowInsetsSides.Vertical
-                        )
-                    )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+        ) {
+            TopBar(
+                title = tab.label,
+                onMenuClick = { menuOpen = !menuOpen }
             )
 
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .windowInsetsPadding(
-                        WindowInsets.safeDrawing.only(
-                            WindowInsetsSides.End + WindowInsetsSides.Vertical
-                        )
-                    )
-            ) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 when (tab) {
                     AppTab.CALC -> PadScreen(viewModel = viewModel, showMessage = showMessage)
                     AppTab.GRAPH -> GraphScreen(viewModel = viewModel, showMessage = showMessage)
@@ -124,82 +120,166 @@ fun AppRoot(viewModel: CalculatorViewModel) {
                         .align(Alignment.BottomCenter)
                         .padding(12.dp)
                 )
+
+                // Dim the tool while the drop-down is open; tapping dismisses it.
+                if (menuOpen) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.45f))
+                            .clickable(
+                                indication = null,
+                                interactionSource = remember { MutableInteractionSource() }
+                            ) { menuOpen = false }
+                    )
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing),
+            contentAlignment = Alignment.TopStart
+        ) {
+            AnimatedVisibility(
+                visible = menuOpen,
+                enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+            ) {
+                DropDownMenuPanel(
+                    selected = tab,
+                    onSelect = { entry ->
+                        tab = entry
+                        menuOpen = false
+                    },
+                    onClose = { menuOpen = false }
+                )
             }
         }
     }
 }
 
-/** Brand tile plus the tabs laid out as [ItemsPerLine] items per line. */
+/** Compact header with the menu button; the drop-down replaces a bottom tab bar. */
 @Composable
-private fun AppSidebar(
+private fun TopBar(
+    title: String,
+    onMenuClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(onClick = onMenuClick) {
+            Icon(
+                imageVector = Icons.Filled.Menu,
+                contentDescription = "Open the tools menu",
+                tint = colors.primary
+            )
+        }
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .background(color = colors.primary, shape = RoundedCornerShape(9.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "M",
+                color = colors.onPrimary,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp
+                )
+            )
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = colors.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 8.dp)
+        )
+    }
+}
+
+/** The panel itself: brand row plus [ItemsPerLine] tiles per line. */
+@Composable
+private fun DropDownMenuPanel(
     selected: AppTab,
     onSelect: (AppTab) -> Unit,
-    modifier: Modifier = Modifier
+    onClose: () -> Unit
 ) {
+    val colors = MaterialTheme.colorScheme
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        modifier = modifier
+        color = colors.surfaceContainerHigh,
+        contentColor = colors.onSurface,
+        shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
+        tonalElevation = 6.dp,
+        shadowElevation = 10.dp,
+        modifier = Modifier
+            .padding(horizontal = 10.dp)
+            .widthIn(max = 560.dp)
+            .fillMaxWidth()
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            BrandMark()
-            Spacer(modifier = Modifier.height(14.dp))
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "M Calculator",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "tap a tool to switch",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurfaceVariant
+                )
+                IconButton(onClick = onClose) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Close the menu",
+                        tint = colors.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
 
             AppTab.entries.chunked(ItemsPerLine).forEach { line ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 3.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     line.forEach { entry ->
-                        SidebarItem(
+                        MenuTile(
                             tab = entry,
                             selected = entry == selected,
                             onClick = { onSelect(entry) },
                             modifier = Modifier.weight(1f)
                         )
                     }
+                    // Keep the last line aligned when it holds fewer items.
+                    repeat(ItemsPerLine - line.size) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = "v1.0",
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
         }
     }
 }
 
+/** One row-shaped entry: icon beside a label, highlighted when active. */
 @Composable
-private fun BrandMark() {
-    val colors = MaterialTheme.colorScheme
-    Box(
-        modifier = Modifier
-            .size(40.dp)
-            .background(color = colors.primary, shape = RoundedCornerShape(13.dp)),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "M",
-            color = colors.onPrimary,
-            style = MaterialTheme.typography.titleLarge.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 20.sp
-            )
-        )
-    }
-}
-
-/** One tappable tab tile: icon above a short label. */
-@Composable
-private fun SidebarItem(
+private fun MenuTile(
     tab: AppTab,
     selected: Boolean,
     onClick: () -> Unit,
@@ -207,27 +287,28 @@ private fun SidebarItem(
 ) {
     val colors = MaterialTheme.colorScheme
     Surface(
-        color = if (selected) colors.primaryContainer else colors.surfaceContainerHigh.copy(alpha = 0.55f),
+        onClick = onClick,
+        color = if (selected) colors.primaryContainer else colors.surfaceContainer,
         contentColor = if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant,
-        shape = RoundedCornerShape(13.dp),
-        modifier = modifier.clickable(onClick = onClick)
+        shape = RoundedCornerShape(14.dp),
+        modifier = modifier
     ) {
-        Column(
-            modifier = Modifier.padding(vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = tab.icon,
-                contentDescription = tab.label,
-                modifier = Modifier.size(21.dp)
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
             )
+            Spacer(modifier = Modifier.width(10.dp))
             Text(
                 text = tab.label,
-                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                textAlign = TextAlign.Center,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
