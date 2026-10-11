@@ -12,7 +12,7 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "com.vikashtechnology.mcalculator"
+    namespace = "com.advanceai.calculator"
     compileSdk = 34
 
     // "Continue with Google" only works for a build whose signing certificate is
@@ -21,9 +21,11 @@ android {
     val bundledKeystore = rootProject.file("app/signing/mcalculator.p12")
     val webClientId: String = (findProperty("googleWebClientId") as String?) ?: ""
     val telemetryUrl: String = (findProperty("telemetryUrl") as String?) ?: ""
+    val geminiKey: String = (findProperty("geminiApiKey") as String?) ?: ""
+    val geminiModelName: String = (findProperty("geminiModel") as String?) ?: ""
 
     defaultConfig {
-        applicationId = "com.vikashtechnology.mcalculator"
+        applicationId = "com.advanceai.calculator"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
@@ -36,6 +38,9 @@ android {
         // Where the anonymous usage counts go (the Cloudflare Worker in
         // admin/worker). Empty = the counters are never sent anywhere.
         buildConfigField("String", "TELEMETRY_URL", "\"$telemetryUrl\"")
+        // A Google AI Studio key turns Ask AI into the native Gemini screen.
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
+        buildConfigField("String", "GEMINI_MODEL", "\"$geminiModelName\"")
     }
 
     signingConfigs {

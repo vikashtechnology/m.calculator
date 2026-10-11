@@ -1,6 +1,6 @@
 # Usage dashboard (admin panel)
 
-A read-only dashboard for M Calculator: how many people installed the app, how
+A read-only dashboard for Ai Calculator: how many people installed the app, how
 many are active, and how many calculations and AI questions were solved per day.
 
 It runs entirely on Cloudflare — one Worker plus one D1 (SQLite) database, both

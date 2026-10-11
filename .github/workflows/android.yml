@@ -63,6 +63,11 @@ jobs:
           # Optional: the Cloudflare Worker URL from admin/worker. Without it the
           # anonymous usage counters stay on the device.
           TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
+          # Optional: a Google AI Studio key. With it Ask AI runs natively
+          # (device Google accounts, no web login page); without it the bundled
+          # Puter page is used.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
         run: |
           set -o pipefail
           GRADLE_ARGS=""
@@ -73,6 +78,15 @@ jobs:
             echo "Google Sign-In: off (no GOOGLE_WEB_CLIENT_ID secret)"
             echo "Signing SHA-1 for registration:"
             cat app/signing/fingerprints.txt | grep "SHA-1"
+          fi
+          if [ -n "$GEMINI_API_KEY" ]; then
+            GRADLE_ARGS="$GRADLE_ARGS -PgeminiApiKey=$GEMINI_API_KEY"
+            echo "Ask AI: native Gemini screen"
+          else
+            echo "Ask AI: bundled Puter page (no GEMINI_API_KEY secret)"
+          fi
+          if [ -n "$GEMINI_MODEL" ]; then
+            GRADLE_ARGS="$GRADLE_ARGS -PgeminiModel=$GEMINI_MODEL"
           fi
           if [ -n "$TELEMETRY_URL" ]; then
             GRADLE_ARGS="$GRADLE_ARGS -PtelemetryUrl=$TELEMETRY_URL"
@@ -104,7 +118,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          NOTES="M Calculator installable APK built from ${GITHUB_SHA:0:7} ($GITHUB_REF_NAME)."
+          NOTES="Ai Calculator installable APK built from ${GITHUB_SHA:0:7} ($GITHUB_REF_NAME)."
           FLAGS=""
           if [ "$GITHUB_REF_NAME" != "main" ]; then FLAGS="--prerelease"; fi
           if gh release view latest-build > /dev/null 2>&1; then
@@ -112,7 +126,7 @@ jobs:
             gh release edit latest-build --notes "$NOTES" $FLAGS
           else
             gh release create latest-build \
-              --title "M Calculator — latest build" \
+              --title "Ai Calculator — latest build" \
               --notes "$NOTES" $FLAGS \
               app/build/outputs/apk/release/*.apk
           fi

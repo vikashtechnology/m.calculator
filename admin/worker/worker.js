@@ -1,5 +1,5 @@
 /**
- * M Calculator — usage stats API and admin dashboard.
+ * Ai Calculator — usage stats API and admin dashboard.
  *
  * One Worker, no dependencies, no build step:
  *   POST /v1/events        the app posts anonymous counters here
@@ -164,7 +164,7 @@ const DASHBOARD_HTML = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>M Calculator — usage</title>
+<title>Ai Calculator — usage</title>
 <style>
   :root { color-scheme: dark; --bg:#141218; --card:#211f26; --line:#332f39;
           --text:#e7e0ec; --muted:#a49fac; --accent:#d0bcff; --bar:#b794f6; }
@@ -191,7 +191,7 @@ const DASHBOARD_HTML = `<!doctype html>
 </style>
 </head>
 <body>
-<h1>M Calculator — usage</h1>
+<h1>Ai Calculator — usage</h1>
 <div class="muted" id="sub">Anonymous counts from installed apps. Nothing personal is stored.</div>
 
 <div class="panel" id="gate">

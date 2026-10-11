@@ -1,0 +1,414 @@
+package com.advanceai.calculator.ui.screens
+
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import com.advanceai.calculator.ai.GeminiClient
+import com.advanceai.calculator.ai.GoogleSignIn
+import kotlinx.coroutines.launch
+
+/**
+ * Ask AI, done natively: pick a photo, a PDF or a text file, send it to Gemini
+ * and read the answer in the app. No WebView, so "Continue with Google" can use
+ * the phone's own account picker instead of Google's web login page.
+ */
+@Composable
+fun AiNativeScreen(
+    onClose: () -> Unit,
+    showMessage: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
+
+    var picked by remember { mutableStateOf<PickedFile?>(null) }
+    var question by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+    var answer by remember { mutableStateOf<String?>(null) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var googleEmail by remember { mutableStateOf("") }
+    var googleBusy by remember { mutableStateOf(false) }
+
+    BackHandler { onClose() }
+
+    val picker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val file = runCatching { readPickedFile(context, uri) }.getOrNull()
+        if (file == null) {
+            error = "That file could not be read. Try another one."
+        } else if (file.bytes.size > GeminiClient.MaxAttachmentBytes) {
+            error = "That file is larger than 15 MB. Try a screenshot instead."
+        } else {
+            picked = file
+            answer = null
+            error = null
+        }
+    }
+
+    fun signInWithGoogle() {
+        if (!GoogleSignIn.isConfigured || googleBusy) {
+            showMessage("Add the GOOGLE_WEB_CLIENT_ID secret to use your Google account")
+            return
+        }
+        googleBusy = true
+        scope.launch {
+            val result = GoogleSignIn.signIn(GoogleSignIn.activityOf(context))
+            googleBusy = false
+            when {
+                result.ok -> {
+                    googleEmail = result.email
+                    showMessage("Signed in as ${result.email}")
+                }
+                result.error == "cancelled" -> Unit
+                result.error == "no_google_account" ->
+                    showMessage("No Google account on this device yet — add one in Settings")
+                else -> showMessage("Google sign-in failed: ${result.error}")
+            }
+        }
+    }
+
+    Column(modifier = modifier.fillMaxSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 4.dp, end = 12.dp, top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back to the calculator",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            Text(
+                text = "Ask AI",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
+            )
+            Surface(
+                onClick = { signInWithGoogle() },
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = when {
+                        googleBusy -> "Signing in…"
+                        googleEmail.isNotEmpty() -> "Google ✓"
+                        else -> "Google"
+                    },
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Upload a photo, a PDF or a text file of a maths question. " +
+                    "Only what is in the file gets solved, and the working comes back with it.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            val current = picked
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    if (current == null) {
+                        Text(
+                            text = "No file chosen yet",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            current.thumbnail?.let { bitmap ->
+                                Image(
+                                    bitmap = bitmap,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .background(MaterialTheme.colorScheme.surface)
+                                )
+                            }
+                            Column(modifier = Modifier.padding(start = 10.dp)) {
+                                Text(
+                                    text = current.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${current.mimeType} · ${formatSize(current.bytes.size)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                picker.launch(arrayOf("image/*", "application/pdf", "text/*"))
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = if (current == null) "Choose a file" else "Replace",
+                                modifier = Modifier.padding(start = 6.dp)
+                            )
+                        }
+                        if (current != null) {
+                            OutlinedButton(
+                                onClick = {
+                                    picked = null
+                                    answer = null
+                                    error = null
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Close,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(text = "Clear", modifier = Modifier.padding(start = 6.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = question,
+                onValueChange = { question = it },
+                label = { Text("Anything to add? (optional)") },
+                singleLine = false,
+                maxLines = 3,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Button(
+                onClick = {
+                    val file = picked ?: return@Button
+                    busy = true
+                    answer = null
+                    error = null
+                    scope.launch {
+                        val result = GeminiClient.solve(
+                            question = question,
+                            attachment = GeminiClient.Attachment(
+                                mimeType = file.mimeType,
+                                bytes = file.bytes,
+                                name = file.name
+                            )
+                        )
+                        busy = false
+                        if (result.ok) answer = result.text else error = result.error
+                    }
+                },
+                enabled = picked != null && !busy,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(text = if (busy) "Solving…" else "Solve this question")
+            }
+
+            if (busy) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp))
+                    Text(
+                        text = "Reading the question and working it out…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            error?.let { message ->
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(14.dp)
+                    )
+                }
+            }
+
+            answer?.let { text ->
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "Answer",
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        SelectionContainer {
+                            Text(
+                                text = text,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier
+                                    .padding(top = 8.dp, bottom = 8.dp)
+                                    .heightIn(min = 60.dp)
+                            )
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            TextButton(onClick = {
+                                clipboard.setText(AnnotatedString(text))
+                                showMessage("Copied the answer")
+                            }) {
+                                Text("Copy")
+                            }
+                            TextButton(onClick = {
+                                answer = null
+                                error = null
+                            }) {
+                                Text("Clear the answer")
+                            }
+                        }
+                    }
+                }
+            }
+
+            Text(
+                text = "The file goes to Google's Gemini API with the model " +
+                    "\"${GeminiClient.model}\" and nothing is stored by this app.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 18.dp)
+            )
+        }
+    }
+}
+
+/** What the picker returned, already read into memory. */
+private class PickedFile(
+    val name: String,
+    val mimeType: String,
+    val bytes: ByteArray,
+    val thumbnail: androidx.compose.ui.graphics.ImageBitmap?
+)
+
+private fun readPickedFile(
+    context: android.content.Context,
+    uri: Uri
+): PickedFile {
+    val resolver = context.contentResolver
+    val mimeType = resolver.getType(uri) ?: "application/octet-stream"
+    val name = resolver.query(uri, null, null, null, null)?.use { cursor ->
+        val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        if (index >= 0 && cursor.moveToFirst()) cursor.getString(index) else null
+    } ?: (uri.lastPathSegment ?: "upload")
+
+    val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
+        ?: throw IllegalStateException("The file could not be opened")
+
+    val thumbnail = if (mimeType.startsWith("image/")) {
+        runCatching {
+            resolver.openInputStream(uri)?.use { input ->
+                BitmapFactory.decodeStream(input)?.asImageBitmap()
+            }
+        }.getOrNull()
+    } else {
+        null
+    }
+
+    return PickedFile(
+        name = name,
+        mimeType = mimeType,
+        bytes = bytes,
+        thumbnail = thumbnail
+    )
+}
+
+private fun formatSize(bytes: Int): String = when {
+    bytes >= 1024 * 1024 -> "${"%.1f".format(bytes / 1024.0 / 1024.0)} MB"
+    bytes >= 1024 -> "${bytes / 1024} KB"
+    else -> "$bytes B"
+}

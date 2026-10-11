@@ -12,7 +12,7 @@ Register the SHA-1 in the Google Cloud / Firebase console so that
 'Continue with Google' works in the app:
   1. console.cloud.google.com > APIs & Services > Credentials
   2. Create an OAuth client ID of type Android
-     package name: com.vikashtechnology.mcalculator
+     package name: com.advanceai.calculator
      SHA-1: the line above
   3. Create an OAuth client ID of type Web (this becomes the
      'googleWebClientId' build property used by the app).
