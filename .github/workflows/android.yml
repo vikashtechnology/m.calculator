@@ -55,9 +55,23 @@ jobs:
       - name: Build debug and release APKs
         id: apk
         continue-on-error: true
+        env:
+          # Optional: set this repository secret to the Google *Web* OAuth client
+          # ID so "Continue with Google" appears in the app. Without it the app
+          # falls back to Puter's own sign-in, which also offers Google.
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
         run: |
           set -o pipefail
-          ./gradlew assembleDebug assembleRelease --stacktrace 2>&1 | tee ci-logs/assemble.log
+          GRADLE_ARGS=""
+          if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
+            GRADLE_ARGS="-PgoogleWebClientId=$GOOGLE_WEB_CLIENT_ID"
+            echo "Google Sign-In: enabled (web client id from secrets)"
+          else
+            echo "Google Sign-In: off (no GOOGLE_WEB_CLIENT_ID secret)"
+            echo "Signing SHA-1 for registration:"
+            cat app/signing/fingerprints.txt | grep "SHA-1"
+          fi
+          ./gradlew assembleDebug assembleRelease --stacktrace $GRADLE_ARGS 2>&1 | tee ci-logs/assemble.log
 
       - name: Upload APKs
         if: steps.apk.outcome == 'success'

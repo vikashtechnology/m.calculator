@@ -47,6 +47,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,6 +62,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebResourceErrorCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewClientCompat
+import com.vikashtechnology.mcalculator.ai.GoogleSignIn
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 /** Where the bundled Ask AI page is served from: a real https origin. */
@@ -85,6 +88,8 @@ fun AiScreen(
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    val scope = rememberCoroutineScope()
+    var googleBusy by remember { mutableStateOf(false) }
 
     var statusText by remember { mutableStateOf("loading…") }
     var statusKind by remember { mutableStateOf("") } // "ok" | "warn" | ""
@@ -117,6 +122,35 @@ fun AiScreen(
             "window.mCalculatorRefreshAuth && window.mCalculatorRefreshAuth();",
             null
         )
+    }
+
+    /**
+     * Runs the Google account picker and hands the ID token to the page, which
+     * uses that same Google account to sign in to Puter.
+     */
+    fun signInWithGoogle() {
+        if (!GoogleSignIn.isConfigured || googleBusy) return
+        googleBusy = true
+        scope.launch {
+            val result = GoogleSignIn.signIn(GoogleSignIn.activityOf(context))
+            googleBusy = false
+            val view = holder.view ?: return@launch
+            if (result.ok) {
+                statusText = result.name.ifEmpty { result.email.ifEmpty { "signed in" } }
+                statusKind = "ok"
+                val argument = JSONObject.quote(result.idToken)
+                val email = JSONObject.quote(result.email)
+                view.evaluateJavascript(
+                    "window.mCalculatorGoogleToken && window.mCalculatorGoogleToken($argument, $email);",
+                    null
+                )
+            } else if (result.error == "cancelled") {
+                showMessage("Sign-in cancelled")
+            } else {
+                showMessage("Google sign-in failed: ${result.error}")
+                refreshAuthInPage()
+            }
+        }
     }
 
     fun openPopupForAuth(source: WebView, resultMsg: Message) {
@@ -238,6 +272,12 @@ fun AiScreen(
 
             override fun onPageFinished(view: WebView, url: String?) {
                 pageLoading = false
+                // Tell the page whether the in-app Google button can be used.
+                view.evaluateJavascript(
+                    "window.mCalculatorGoogleAvailable && " +
+                        "window.mCalculatorGoogleAvailable(${GoogleSignIn.isConfigured});",
+                    null
+                )
             }
 
             override fun onReceivedError(
@@ -290,6 +330,21 @@ fun AiScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f)
             )
+            if (GoogleSignIn.isConfigured) {
+                Surface(
+                    onClick = { signInWithGoogle() },
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.padding(end = 8.dp)
+                ) {
+                    Text(
+                        text = if (googleBusy) "Signing in…" else "Google",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
             Surface(
                 color = when (statusKind) {
                     "ok" -> MaterialTheme.colorScheme.secondaryContainer
@@ -355,6 +410,18 @@ fun AiScreen(
                                                     if (text.isNotEmpty()) {
                                                         clipboard.setText(AnnotatedString(text))
                                                         showMessage("Copied the answer")
+                                                    }
+                                                }
+                                                "googleSignIn" -> {
+                                                    if (!payload.optBoolean("signedIn")) {
+                                                        signInWithGoogle()
+                                                    }
+                                                }
+                                                "googleSignOut" -> {
+                                                    scope.launch {
+                                                        GoogleSignIn.signOut(
+                                                            GoogleSignIn.activityOf(context)
+                                                        )
                                                     }
                                                 }
                                             }

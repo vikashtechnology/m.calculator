@@ -30,7 +30,9 @@ the Ask AI screen ever uses it.
 ### Navigation
 The six tools live in a **drop-down menu**: tap the ☰ button in the top bar and the
 panel drops down over the screen with three lines of two tiles (Calc, Graph /
-Solve, Matrix / Units, Stats). Pick a tile to switch, or dismiss it by tapping the
+Solve, Matrix / Units, Stats), followed by **Everyday calculators** — ten small
+tools in three-per-line tiles (GST, Tax, EMI, BMI, Percent, Interest, Profit,
+Algebra, Bases, Age). Pick a tile to switch, or dismiss it by tapping the
 scrim, the close icon, the ☰ button again, or the back button. Because the menu
 overlays rather than reserves space, every tool uses the full screen — and the
 keypad no longer shares the screen with a bottom tab bar.
@@ -79,13 +81,52 @@ type `12 km to mi` and press Convert.
 Paste numbers and get count, sum, mean, median, quartiles, min/max, range, sample
 and population standard deviation and variance.
 
+### Everyday calculators
+Tap ☰ and pick a tile; the tools open over the pad and the ☰ still switches
+between them. Every field recalculates as you type — there is no Solve button.
+
+| Tool | What it does |
+| --- | --- |
+| **GST** | Exclusive/inclusive split with CGST and SGST halves, any rate |
+| **Tax** | Indian income tax, FY 2025-26 (new regime) and old regime, slab breakdown, rebate and marginal relief, cess, effective rate |
+| **EMI** | Monthly instalment, total interest, and a month-by-month amortisation table |
+| **BMI** | Body mass index with the category and the healthy weight range |
+| **Percent** | X% of Y, X is what % of Y, % change, and ±% change of a value |
+| **Interest** | Simple and compound interest side by side, with yearly/quarterly/monthly compounding |
+| **Profit** | Profit or loss, the profit percentage, margin on cost and selling price, markup |
+| **Algebra** | Quadratic roots (including complex), discriminant and vertex, primes, prime factorisation |
+| **Bases** | Convert between binary, octal, decimal, hex and any base from 2 to 36 |
+| **Age** | Age in years/months/days plus total days/weeks/months and days to the next birthday |
+
+### Sign in with Google (optional)
+Ask AI can start from the app's own **Continue with Google**. That account is the
+same one Puter offers inside its sign-in window, so one Google account covers both:
+
+* the app signs in with Google (Credential Manager) and hands the ID token to the
+  Ask AI page, which remembers the account and, after the Puter sign-in, checks
+  that both are the same address — the header chip shows `Google ✓` when linked
+* the Google button only appears once an OAuth *Web* client ID is configured,
+  because a client ID that does not match the signing certificate can only fail
+
+To switch it on:
+
+1. Register the signing certificate's SHA-1 (see `app/signing/fingerprints.txt`)
+   for the package name `com.vikashtechnology.mcalculator` in the Google Cloud
+   console → *APIs & Services* → *Credentials* → *Create OAuth client ID* → Android.
+2. Create a second client ID of type **Web** and put it in the repository secret
+   `GOOGLE_WEB_CLIENT_ID` (CI) or in `gradle.properties` as `googleWebClientId`.
+
+Every build is signed with the key in `app/signing/`, so the fingerprint above
+never changes and Android updates install straight over the previous version.
+
 ### Ask AI (optional, needs internet)
 The hero card at the top of the pad opens **Ask AI**, which solves a question you
 upload — a photo, a PDF or a text file — and shows the working. It is powered by
 [Puter.js](https://developer.puter.com/), which supplies both the account and the
 model, so the app needs no API keys and no backend of its own:
 
-* sign in with a Puter account, or create a temporary one with *Continue as guest*
+* sign in with a Puter account (or *Continue with Google* in the app header), or
+  create a temporary one with *Continue as guest*
 * upload a question, choose whether you want the steps, and press **Solve this question**
 * the prompt is deliberately narrow: the model is told to solve *only* the
   question in the file, and to say so when the upload holds no maths question
@@ -110,8 +151,8 @@ Material 3 palette tuned for both.
 # Command line:
 ./gradlew assembleDebug          # APK in app/build/outputs/apk/debug/
 ./gradlew testDebugUnitTest      # math engine test suite
-./gradlew assembleRelease        # release APK (uses the debug key unless
-                                 # keystore.properties is present)
+./gradlew assembleRelease        # release APK (uses the bundled key in
+                                 # app/signing/ unless keystore.properties exists)
 
 # Optional signing for a real release build:
 cat > keystore.properties <<'EOF'

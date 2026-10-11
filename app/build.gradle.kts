@@ -15,6 +15,12 @@ android {
     namespace = "com.vikashtechnology.mcalculator"
     compileSdk = 34
 
+    // "Continue with Google" only works for a build whose signing certificate is
+    // registered in the Google Cloud console, so the project signs every build
+    // with the same committed key. Its SHA-1 is in app/signing/fingerprints.txt.
+    val bundledKeystore = rootProject.file("app/signing/mcalculator.p12")
+    val webClientId: String = (findProperty("googleWebClientId") as String?) ?: ""
+
     defaultConfig {
         applicationId = "com.vikashtechnology.mcalculator"
         minSdk = 24
@@ -23,9 +29,18 @@ android {
         versionName = "1.0.0"
         resourceConfigurations += listOf("en")
         vectorDrawables { useSupportLibrary = true }
+        // Empty means Google Sign-In is hidden in the app; the Ask AI screen
+        // then uses Puter's own sign-in, which also offers Google.
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$webClientId\"")
     }
 
     signingConfigs {
+        create("bundled") {
+            storeFile = bundledKeystore
+            storePassword = "mcalculator"
+            keyAlias = "mcalculator"
+            keyPassword = "mcalculator"
+        }
         if (keystoreProperties.getProperty("storeFile") != null) {
             create("release") {
                 storeFile = file(keystoreProperties.getProperty("storeFile"))
@@ -38,9 +53,11 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
+            // No applicationIdSuffix: the package name must match the OAuth
+            // client registered for Google Sign-In.
             versionNameSuffix = "-debug"
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("bundled")
         }
         release {
             isMinifyEnabled = false
@@ -49,12 +66,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Falls back to the debug key so `assembleRelease` always produces an
-            // installable APK. Provide keystore.properties for a real release key.
+            // Uses the committed key so the fingerprint stays stable; provide
+            // keystore.properties to sign with your own release key instead.
             signingConfig = if (keystoreProperties.getProperty("storeFile") != null) {
                 signingConfigs.getByName("release")
             } else {
-                signingConfigs.getByName("debug")
+                signingConfigs.getByName("bundled")
             }
         }
     }
@@ -62,6 +79,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // java.time (used by the age calculator) on Android 7 and below.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -70,6 +89,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {
@@ -91,6 +111,12 @@ dependencies {
     // WebViewAssetLoader serves the bundled "Ask AI" page over an https origin,
     // which Puter needs for sign-in (a file:// page has no origin to sign in).
     implementation("androidx.webkit:webkit:1.11.0")
+    // "Continue with Google": Credential Manager plus the Google ID helper.
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
+    // Backport of java.time for minSdk 24.
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     implementation(platform("androidx.compose:compose-bom:2024.09.00"))
     implementation("androidx.compose.ui:ui")

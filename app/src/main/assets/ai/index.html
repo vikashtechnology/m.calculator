@@ -139,10 +139,12 @@
     The solver runs on your Puter account, which also keeps your usage free.
     Sign in once and the app remembers you.
   </p>
-  <button class="primary" id="signInBtn">Sign in with Puter</button>
+  <button class="primary hidden" id="googleBtn">Continue with Google</button>
+  <button class="primary" id="signInBtn" style="margin-top:8px">Sign in with Puter</button>
   <div class="row" style="margin-top:8px">
     <button class="ghost small grow" id="guestBtn">Continue as guest</button>
   </div>
+  <div class="hint" id="googleHint" style="display:none"></div>
   <div class="error hidden" id="authError"></div>
 </div>
 
@@ -195,7 +197,9 @@
     textContent: null,   // extracted text for text/pdf files
     solving: false,
     cancelled: false,
-    signedIn: false
+    signedIn: false,
+    googleEmail: "",     // set by the app after "Continue with Google"
+    googleToken: ""      // Google ID token handed over by the app
   };
 
   var el = function (id) { return document.getElementById(id); };
@@ -242,6 +246,72 @@
         setTimeout(poll, 200);
       })();
     });
+  }
+
+  // ---- Google account -----------------------------------------------------
+  // The app signs in with Google (not this page), then hands the ID token over
+  // so Puter can be linked to the very same Google account.
+  function googleAvailable(enabled) {
+    el("googleBtn").classList.toggle("hidden", !enabled);
+  }
+
+  function setGoogleHint(text) {
+    var box = el("googleHint");
+    if (text) {
+      box.textContent = text;
+      box.style.display = "block";
+    } else {
+      box.style.display = "none";
+    }
+  }
+
+  window.mCalculatorGoogleAvailable = googleAvailable;
+
+  /**
+   * Called by the app after a successful "Continue with Google".
+   * The Google account is remembered, and Puter is asked to sign in with the
+   * same account (Puter's own window offers Google, so this is one more tap).
+   */
+  window.mCalculatorGoogleToken = function (idToken, email) {
+    state.googleEmail = email || "";
+    state.googleToken = idToken || "";
+    setGoogleHint(
+      "Google: " + (email || "signed in") +
+      (state.signedIn ? "" : " — finish the Puter sign-in with the same Google account.")
+    );
+    el("authError").classList.add("hidden");
+    if (el("authChip").className !== "chip ok") {
+      el("authChip").textContent = "Google ✓";
+      el("authChip").className = "chip ok";
+    }
+    if (state.signedIn) {
+      return verifySameAccount();
+    }
+    // Not signed in to Puter yet: open its sign-in window, where the same
+    // Google account can be chosen, then verify that both match.
+    return signIn();
+  };
+
+  /** Compares the Google account with the Puter account and reports. */
+  function verifySameAccount() {
+    return Promise.resolve(puter.auth.getUser())
+      .then(function (user) {
+        var puterEmail = (user && (user.email || user.username)) || "";
+        if (state.googleEmail && puterEmail &&
+            puterEmail.toLowerCase() === state.googleEmail.toLowerCase()) {
+          setGoogleHint("Google and Puter: " + puterEmail + " — linked ✓");
+          el("authChip").textContent = "Google ✓";
+          el("authChip").className = "chip ok";
+        } else if (state.googleEmail) {
+          setGoogleHint(
+            "Puter is signed in as " + puterEmail + " but Google as " +
+            state.googleEmail + ". Sign out and pick the same Google " +
+            "account to keep one account for both."
+          );
+        }
+        return user;
+      })
+      .catch(function () { return null; });
   }
 
   // ---- auth ---------------------------------------------------------------
@@ -295,6 +365,7 @@
     return waitForPuter(20000)
       .then(function () { return puter.auth.signIn(options); })
       .then(function () { return refreshAuth(); })
+      .then(function () { return state.googleEmail ? verifySameAccount() : null; })
       .catch(function (error) {
         var message = (error && (error.msg || error.message)) || String(error);
         if (error && error.error === "popup_blocked") {
@@ -590,6 +661,10 @@
 
   // ---- wiring ------------------------------------------------------------
   el("signInBtn").addEventListener("click", function () { signIn(); });
+  // The account picker is native (Credential Manager), so this only asks the app.
+  el("googleBtn").addEventListener("click", function () {
+    notify({ event: "googleSignIn", signedIn: state.signedIn });
+  });
   el("guestBtn").addEventListener("click", function () {
     signIn({ attempt_temp_user_creation: true });
   });
@@ -606,7 +681,14 @@
   });
   el("copyBtn").addEventListener("click", copyAnswer);
   // Handy after finishing a sign-in in the popup window.
-  el("authChip").addEventListener("click", function () { refreshAuth(); });
+  el("authChip").addEventListener("click", function () {
+    // Tap: re-check, or start the Google sign-in when nothing is linked yet.
+    if (!state.signedIn) {
+      notify({ event: "googleSignIn", signedIn: false });
+    } else {
+      refreshAuth();
+    }
+  });
 
   window.addEventListener("error", function (event) {
     if (event && event.message) showError(event.message);

@@ -76,9 +76,19 @@ fun HelpSheet(onDismiss: () -> Unit) {
                 )
             )
             Section(
+                "Everyday calculators",
+                listOf(
+                    "Tap ☰ and pick a tile: GST, Tax, EMI, BMI, Percent, Interest, Profit, Algebra, Bases, Age.",
+                    "Everything recalculates as you type — there is no Solve button.",
+                    "Tax covers both Indian regimes for FY 2025-26, with the slab breakdown.",
+                    "EMI also shows the month-by-month amortisation of the loan."
+                )
+            )
+            Section(
                 "Ask AI",
                 listOf(
                     "Tap the Ask AI card at the top of the pad, or the Ask AI row in the menu.",
+                    "If 'Google' appears in the Ask AI header, tap it to use your Google account;",
                     "Sign in with a Puter account the first time; 'Continue as guest' makes a temporary one.",
                     "Upload a photo, a PDF or a text file of a question and press Solve this question.",
                     "It only solves the question in the file you upload. This screen needs internet;",
