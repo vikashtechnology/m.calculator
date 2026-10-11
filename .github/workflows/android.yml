@@ -69,6 +69,23 @@ jobs:
             app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
+      - name: Publish the APK as the "latest-build" release
+        if: steps.apk.outcome == 'success' && (github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          NOTES="M Calculator installable APK built from ${GITHUB_SHA:0:7} ($GITHUB_REF_NAME)."
+          if gh release view latest-build > /dev/null 2>&1; then
+            gh release upload latest-build app/build/outputs/apk/release/*.apk --clobber
+            gh release edit latest-build --notes "$NOTES"
+          else
+            gh release create latest-build \
+              --title "M Calculator — latest build" \
+              --notes "$NOTES" \
+              app/build/outputs/apk/release/*.apk
+          fi
+
       - name: Publish test report
         if: always()
         uses: actions/upload-artifact@v4
@@ -92,7 +109,9 @@ jobs:
             echo
             echo '## Errors'
             echo '```'
-            grep -h -E "^(e|w): |error: |What went wrong|Execution failed for task|FAILURE: Build|Caused by: [a-z]|\* Try|\* What went wrong|AAPT" ci-logs/*.log 2>/dev/null | head -c 30000
+            grep -h -E "^(e|w): |error: |What went wrong|Execution failed for task|FAILURE: Build|Caused by: [a-z]|\* Try|\* What went wrong|AAPT" ci-logs/*.log 2>/dev/null \
+              | sed -E 's#file:///home/runner/work/m.calculator/m.calculator/##' \
+              | sort -u | head -200
             echo '```'
             echo
             echo '## Failing tests'
@@ -109,7 +128,7 @@ jobs:
             echo '```'
             echo '## Assemble log tail'
             echo '```'
-            tail -c 20000 ci-logs/assemble.log 2>/dev/null
+            tail -c 12000 ci-logs/assemble.log 2>/dev/null
             echo '```'
           } > ci-failure.md || true
           BODY="$(head -c 60000 ci-failure.md)"

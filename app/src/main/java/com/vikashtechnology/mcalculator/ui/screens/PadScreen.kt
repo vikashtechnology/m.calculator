@@ -99,10 +99,7 @@ fun PadScreen(
         Keypad(
             page = state.page,
             second = state.second,
-            onKey = { key ->
-                viewModel.onKey(key)
-                if (key.id == "eq") Unit // keep the snackbar quiet on evaluate
-            },
+            onKey = { key -> viewModel.onKey(key) },
             onLongPressKey = { key ->
                 if (key.longPressAction != null) {
                     viewModel.onLongPress(key)

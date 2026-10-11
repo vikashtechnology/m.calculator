@@ -106,7 +106,7 @@ object Evaluator {
         a is Num && b is Num -> numericBinary(op, a, b)
         a is Mat && b is Mat -> matrixBinary(op, a, b)
         a is Mat && b is Num -> scalarOnMatrix(op, a, b, matrixOnLeft = true)
-        a is Num && b is Mat -> scalarOnMatrix(op, a, b, matrixOnLeft = false)
+        a is Num && b is Mat -> scalarOnMatrix(op, b, a, matrixOnLeft = false)
         else -> throw MathError("Unsupported operands", pos)
     }
 
@@ -143,17 +143,15 @@ object Evaluator {
 
     private fun scalarOnMatrix(op: String, mat: Mat, scalar: Num, matrixOnLeft: Boolean): Value {
         val s = realOrNull(scalar, "matrix arithmetic")
-        return when {
-            op == "*" -> MatrixMath.scale(mat, s)
-            op == "/" && matrixOnLeft -> {
+        return when (op) {
+            "*" -> MatrixMath.scale(mat, s)
+            "/" -> {
+                if (!matrixOnLeft) throw MathError("Cannot divide a number by a matrix")
                 if (s == 0.0) throw MathError("Division by zero")
                 MatrixMath.scale(mat, 1.0 / s)
             }
-            op == "+" || op == "-" -> {
-                if (!matrixOnLeft) throw MathError("Cannot add a matrix to a number")
-                val sign = if (op == "+") 1.0 else -1.0
-                mat.map { it + sign * s }
-            }
+            "+" -> mat.map { it + s }
+            "-" -> if (matrixOnLeft) mat.map { it - s } else mat.map { s - it }
             else -> throw MathError("Operator '$op' is not defined between a matrix and a number")
         }
     }
@@ -163,7 +161,7 @@ object Evaluator {
 object Factorials {
 
     fun factorial(x: Double): Double {
-        if (Double.isNaN(x)) return Double.NaN
+        if (x.isNaN()) return Double.NaN
         if (x < 0 && Math.rint(x) == x) throw MathError("Factorial of a negative integer is undefined")
         if (x > 170.5) return Double.POSITIVE_INFINITY
         if (Math.rint(x) == x) {
@@ -180,7 +178,7 @@ object Factorials {
 
     /** Lanczos approximation of the gamma function. */
     fun gamma(x: Double): Double {
-        if (Double.isNaN(x)) return Double.NaN
+        if (x.isNaN()) return Double.NaN
         if (x < 0.5) {
             // Reflection formula keeps the poles usable.
             val s = Math.sin(Math.PI * x)

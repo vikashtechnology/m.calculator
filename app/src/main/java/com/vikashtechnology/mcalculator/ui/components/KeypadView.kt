@@ -1,6 +1,5 @@
 package com.vikashtechnology.mcalculator.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box

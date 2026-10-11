@@ -104,44 +104,47 @@ object Calculus {
         // 1. Newton-Raphson from the provided guess.
         var x = guess.coerceIn(min, max)
         var converged = false
-        repeat(80) {
-            val fx = runCatching { f(x) }.getOrNull() ?: return@repeat
+        var iteration = 0
+        while (iteration < 80 && !converged) {
+            val fx = safeEval(f, x) ?: break
             if (abs(fx) < 1e-13) {
                 converged = true
-                return@repeat
+                break
             }
             val h = 1e-6 * max(1.0, abs(x))
-            val dfx = (runCatching { f(x + h) }.getOrNull() ?: return@repeat) -
-                (runCatching { f(x - h) }.getOrNull() ?: return@repeat)
-            val slope = dfx / (2 * h)
-            if (slope == 0.0 || slope.isNaN()) return@repeat
+            val fPlus = safeEval(f, x + h) ?: break
+            val fMinus = safeEval(f, x - h) ?: break
+            val slope = (fPlus - fMinus) / (2 * h)
+            if (slope == 0.0 || slope.isNaN()) break
             val next = x - fx / slope
-            if (next.isNaN() || next.isInfinite()) return@repeat
+            if (next.isNaN() || next.isInfinite()) break
             x = next.coerceIn(min, max)
+            iteration++
         }
-        if (converged && abs(runCatching { f(x) }.getOrDefault(Double.NaN)) < 1e-9) addRoot(x)
+        if (converged) addRoot(x)
 
-        // 2. Sign-change scan across the interval.
+        // 2. Sign-change scan across the interval, refined by bisection.
         val samples = 2000
         val step = (max - min) / samples
         if (step > 0) {
             var prevX = min
-            var prevF = runCatching { f(prevX) }.getOrNull()
-            for (i in 1..samples) {
+            var prevF = safeEval(f, prevX)
+            scan@ for (i in 1..samples) {
                 val curX = min + i * step
-                val curF = runCatching { f(curX) }.getOrNull()
+                val curF = safeEval(f, curX)
                 if (prevF != null && curF != null && prevF != 0.0 && curF != 0.0 &&
                     (prevF > 0) != (curF > 0)
                 ) {
                     var lo = prevX
                     var hi = curX
-                    repeat(120) {
+                    val loPositive = prevF > 0
+                    repeat(80) {
                         val mid = (lo + hi) / 2
-                        val fmid = runCatching { f(mid) }.getOrNull() ?: return@repeat
-                        if ((f(lo) > 0) != (fmid > 0)) hi = mid else lo = mid
+                        val fmid = safeEval(f, mid)
+                        if (fmid != null && (fmid > 0) != loPositive) hi = mid else lo = mid
                     }
                     addRoot((lo + hi) / 2)
-                    if (roots.size >= maxRoots) return@repeat
+                    if (roots.size >= maxRoots) break@scan
                 }
                 prevX = curX
                 prevF = curF
@@ -149,6 +152,9 @@ object Calculus {
         }
         return roots.sorted()
     }
+
+    private fun safeEval(f: (Double) -> Double, x: Double): Double? =
+        runCatching { f(x) }.getOrNull()?.takeIf { it.isFinite() || it.isNaN() }
 
     /** Samples y = f(x) for plotting. `null` marks a point outside the domain. */
     fun samples(
