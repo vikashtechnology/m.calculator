@@ -107,7 +107,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          NOTES="Ai Calculator installable APK built from ${GITHUB_SHA:0:7} ($GITHUB_REF_NAME)."
+          NOTES="AI Calculator installable APK built from ${GITHUB_SHA:0:7} ($GITHUB_REF_NAME)."
           FLAGS=""
           if [ "$GITHUB_REF_NAME" != "main" ]; then FLAGS="--prerelease"; fi
           if gh release view latest-build > /dev/null 2>&1; then
@@ -115,7 +115,7 @@ jobs:
             gh release edit latest-build --notes "$NOTES" $FLAGS
           else
             gh release create latest-build \
-              --title "Ai Calculator — latest build" \
+              --title "AI Calculator — latest build" \
               --notes "$NOTES" $FLAGS \
               app/build/outputs/apk/release/*.apk
           fi

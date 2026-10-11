@@ -2,7 +2,7 @@
 
 One Worker does two jobs:
 
-1. a read-only dashboard for Ai Calculator: installs, active users, and
+1. a read-only dashboard for AI Calculator: installs, active users, and
    calculations and AI questions per day;
 2. **optionally, the Ask AI backend**: it holds the Gemini key and answers
    questions for signed-in users, so the key never ships inside the APK.

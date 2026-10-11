@@ -322,7 +322,7 @@ private fun DropDownMenuPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Ai Calculator",
+                    text = "AI Calculator",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f)
                 )

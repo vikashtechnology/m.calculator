@@ -1,0 +1,206 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradients -->
+    <radialGradient id="bgRadial" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#020617" />
+    </radialGradient>
+
+    <linearGradient id="baseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#312e81" />
+      <stop offset="40%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <!-- Screen Gradients -->
+    <linearGradient id="screenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#020617" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+
+    <linearGradient id="screenReflect" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- AI Accent Gradient -->
+    <linearGradient id="aiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee" />
+      <stop offset="50%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#d946ef" />
+    </linearGradient>
+
+    <!-- Button Gradients -->
+    <linearGradient id="btnGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+
+    <linearGradient id="btnHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+
+    <linearGradient id="opGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#6d28d9" />
+    </linearGradient>
+
+    <!-- Filters -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="20" flood-color="#000000" flood-opacity="0.6" />
+    </filter>
+    
+    <filter id="innerShadow">
+      <feOffset dx="0" dy="4"/>
+      <feGaussianBlur stdDeviation="5" result="offset-blur"/>
+      <feComposite operator="out" in="SourceGraphic" in2="offset-blur" result="inverse"/>
+      <feFlood flood-color="black" flood-opacity="0.8" result="color"/>
+      <feComposite operator="in" in="color" in2="inverse" result="shadow"/>
+      <feComposite operator="over" in="shadow" in2="SourceGraphic"/>
+    </filter>
+
+    <!-- Screen Grid Pattern -->
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#1e293b" stroke-width="0.5" opacity="0.4"/>
+    </pattern>
+  </defs>
+
+  <!-- App Icon Base -->
+  <rect x="32" y="32" width="448" height="448" rx="105" fill="url(#baseGrad)" filter="url(#dropShadow)" />
+  
+  <!-- Base Glass Highlight -->
+  <path d="M 32 137 Q 32 32 137 32 L 375 32 Q 256 100 137 261 Q 80 330 32 385 Z" fill="#ffffff" opacity="0.08" />
+  <rect x="32" y="32" width="448" height="448" rx="105" fill="none" stroke="#ffffff" stroke-width="2" stroke-opacity="0.15" />
+  <rect x="34" y="34" width="444" height="444" rx="103" fill="none" stroke="#000000" stroke-width="2" stroke-opacity="0.3" />
+
+  <!-- Calculator Body -->
+  <rect x="64" y="64" width="384" height="384" rx="60" fill="#0f172a" opacity="0.7" stroke="#1e293b" stroke-width="2" />
+
+  <!-- Screen -->
+  <rect x="80" y="80" width="352" height="140" rx="30" fill="url(#screenGrad)" stroke="#1e293b" stroke-width="2" filter="url(#innerShadow)" />
+  <rect x="80" y="80" width="352" height="140" rx="30" fill="url(#grid)" opacity="0.5" />
+  <rect x="80" y="80" width="352" height="70" rx="30" fill="url(#screenReflect)" />
+
+  <!-- AI Math Equation on Screen (Replaces Brain) -->
+  <g filter="url(#glow)">
+    <!-- Glowing Equation: Integral of e^(-x^2) -->
+    <text x="256" y="155" font-family="'Times New Roman', serif" font-size="42" font-style="italic" text-anchor="middle" fill="#ffffff">
+      <tspan fill="#22d3ee">∫</tspan>
+      <tspan font-size="22" dy="-14"></tspan>
+      <tspan font-size="22" dy="14">0</tspan>
+      <tspan dy="0"> e</tspan>
+      <tspan font-size="24" dy="-16">-x²</tspan>
+      <tspan font-size="42" dy="16"> dx = </tspan>
+      <tspan fill="#a855f7">√π</tspan>
+    </text>
+    
+    <!-- Floating AI Math Particles around equation -->
+    <circle cx="130" cy="110" r="3" fill="#22d3ee" opacity="0.8" />
+    <circle cx="380" cy="120" r="4" fill="#a855f7" opacity="0.9" />
+    <circle cx="150" cy="190" r="2" fill="#d946ef" opacity="0.7" />
+    <circle cx="360" cy="180" r="3" fill="#ffffff" opacity="0.8" />
+  </g>
+
+  <!-- Calculator Buttons (4x4 Grid with Math Symbols) -->
+  <!-- Row 1 -->
+  <g>
+    <rect x="80" y="240" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#475569" stroke-width="1" />
+    <rect x="80" y="240" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="115" y="270" fill="#f8fafc" font-family="serif" font-size="26" font-style="italic" text-anchor="middle" dominant-baseline="central">π</text>
+
+    <rect x="162" y="240" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#475569" stroke-width="1" />
+    <rect x="162" y="240" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="197" y="270" fill="#f8fafc" font-family="serif" font-size="26" font-style="italic" text-anchor="middle" dominant-baseline="central">e</text>
+
+    <rect x="244" y="240" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#475569" stroke-width="1" />
+    <rect x="244" y="240" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="279" y="270" fill="#f8fafc" font-family="serif" font-size="26" font-style="italic" text-anchor="middle" dominant-baseline="central">∫</text>
+
+    <rect x="326" y="240" width="70" height="50" rx="15" fill="url(#opGrad)" stroke="#7c3aed" stroke-width="1" filter="url(#softGlow)" />
+    <rect x="326" y="240" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="361" y="270" fill="#ffffff" font-family="system-ui, sans-serif" font-size="26" font-weight="600" text-anchor="middle" dominant-baseline="central">÷</text>
+  </g>
+
+  <!-- Row 2 -->
+  <g>
+    <rect x="80" y="300" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#475569" stroke-width="1" />
+    <rect x="80" y="300" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="115" y="330" fill="#f8fafc" font-family="serif" font-size="26" font-style="italic" text-anchor="middle" dominant-baseline="central">∑</text>
+
+    <rect x="162" y="300" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#475569" stroke-width="1" />
+    <rect x="162" y="300" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="197" y="330" fill="#f8fafc" font-family="serif" font-size="26" font-style="italic" text-anchor="middle" dominant-baseline="central">√</text>
+
+    <rect x="244" y="300" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#475569" stroke-width="1" />
+    <rect x="244" y="300" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="279" y="330" fill="#f8fafc" font-family="serif" font-size="26" font-style="" text-anchor="middle" dominant-baseline="central">Ai</text>
+
+    <rect x="326" y="300" width="70" height="50" rx="15" fill="url(#opGrad)" stroke="#7c3aed" stroke-width="1" filter="url(#softGlow)" />
+    <rect x="326" y="300" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="361" y="330" fill="#ffffff" font-family="system-ui, sans-serif" font-size="26" font-weight="600" text-anchor="middle" dominant-baseline="central">×</text>
+  </g>
+
+  <!-- Row 3 -->
+  <g>
+    <rect x="80" y="360" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#475569" stroke-width="1" />
+    <rect x="80" y="360" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="115" y="390" fill="#f8fafc" font-family="serif" font-size="26" font-style="italic" text-anchor="middle" dominant-baseline="central">Δ</text>
+
+    <rect x="162" y="360" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#475569" stroke-width="1" />
+    <rect x="162" y="360" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="197" y="390" fill="#f8fafc" font-family="serif" font-size="26" font-style="italic" text-anchor="middle" dominant-baseline="central">∂</text>
+
+    <rect x="244" y="360" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#475569" stroke-width="1" />
+    <rect x="244" y="360" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="279" y="390" fill="#f8fafc" font-family="serif" font-size="26" font-style="italic" text-anchor="middle" dominant-baseline="central">∇</text>
+
+    <rect x="326" y="360" width="70" height="50" rx="15" fill="url(#opGrad)" stroke="#7c3aed" stroke-width="1" filter="url(#softGlow)" />
+    <rect x="326" y="360" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="361" y="390" fill="#ffffff" font-family="system-ui, sans-serif" font-size="26" font-weight="600" text-anchor="middle" dominant-baseline="central">-</text>
+  </g>
+
+  <!-- Row 4 (Added for complete 4x4 grid) -->
+  <g>
+    <rect x="80" y="420" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#475569" stroke-width="1" />
+    <rect x="80" y="420" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="115" y="450" fill="#f8fafc" font-family="serif" font-size="26" font-style="italic" text-anchor="middle" dominant-baseline="central">±</text>
+
+    <rect x="162" y="420" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#475569" stroke-width="1" />
+    <rect x="162" y="420" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="197" y="450" fill="#f8fafc" font-family="serif" font-size="26" font-style="italic" text-anchor="middle" dominant-baseline="central">≈</text>
+
+    <rect x="244" y="420" width="70" height="50" rx="15" fill="url(#btnGrad)" stroke="#528956" stroke-width="1" />
+    <rect x="244" y="420" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="279" y="450" fill="#f8fafc" font-family="serif" font-size="26" font-style="BOLD" text-anchor="middle" dominant-baseline="central">=</text>
+
+    <rect x="326" y="420" width="70" height="50" rx="15" fill="url(#opGrad)" stroke="#7c3aed" stroke-width="1" filter="url(#softGlow)" />
+    <rect x="326" y="420" width="70" height="25" rx="15" fill="url(#btnHighlight)" />
+    <text x="361" y="450" fill="#ffffff" font-family="system-ui, sans-serif" font-size="26" font-weight="600" text-anchor="middle" dominant-baseline="central">+</text>
+  </g>
+
+  <!-- Floating AI Particles/Sparkles (Right Side) -->
+  <g filter="url(#glow)">
+    <circle cx="430" cy="110" r="3" fill="#22d3ee" />
+    <circle cx="445" cy="125" r="2" fill="#a855f7" />
+    <circle cx="420" cy="135" r="4" fill="#ffffff" opacity="0.9" />
+    <path d="M 455 95 L 460 110 L 475 115 L 460 120 L 455 135 L 450 120 L 435 115 L 450 110 Z" fill="#22d3ee" opacity="0.8" />
+    <circle cx="440" cy="150" r="2" fill="#d946ef" />
+  </g>
+</svg>

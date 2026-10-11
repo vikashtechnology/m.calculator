@@ -1,4 +1,4 @@
-# Ai Calculator
+# AI Calculator
 
 An advanced scientific calculator for Android — offline, ad-free and open source.
 Written in Kotlin with Jetpack Compose, it ships a hand-written math engine that

@@ -31,7 +31,7 @@ fun HelpSheet(onDismiss: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
         ) {
-            Text("How to use Ai Calculator", style = MaterialTheme.typography.titleLarge)
+            Text("How to use AI Calculator", style = MaterialTheme.typography.titleLarge)
             Section(
                 "Typing",
                 listOf(
