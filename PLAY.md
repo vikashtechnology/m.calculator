@@ -212,6 +212,42 @@ why a build straight off CI shows a "Test Ad" banner and earns nothing.
   before any ad is requested; where Google requires a way back into it, the app
   menu shows **Privacy settings**. Answer *App content → Ads* accordingly.
 
+## Creating the AdMob app and ad unit, click by click
+
+1. **Sign in** at <https://admob.google.com> with the Google account you want to
+   keep for this app — an AdMob app cannot be moved to another account later.
+2. **First-time sign-up:** accept the terms, then set your **country** and
+   **time zone**. Reports follow the time zone, so pick the one you actually
+   live in; it cannot be changed afterwards.
+3. **Payments — can wait:** *Payments → Add payment method* (name, address, bank
+   details). Nothing is paid out until you pass the threshold shown there, so
+   this is only needed before the first payout.
+4. **Add the app:** *Apps → Add app*.
+   * Platform: **Android**.
+   * "Is your app listed on a supported app store?" → **No** (it is not on Play
+     yet; that answer is fine).
+   * App name: `AI Calculator`.
+   AdMob then shows the **App ID** — the one with the tilde, like
+   `ca-app-pub-0000000000000000~0000000000`.
+5. **Add the banner unit:** open the app → *Ad units → Add ad unit* → **Banner**.
+   * Name: `Calculator banner` (any name works).
+   * Leave the advanced settings alone; the default refresh rate is what the
+     code expects.
+   * Save, then copy the **ad unit ID** — the one with the slash, like
+     `ca-app-pub-0000000000000000/0000000000`.
+6. **Put both into the build:** `gradle.properties` → `admobAppId=…` and
+   `admobBannerUnitId=…`, then rebuild. No code changes needed.
+7. **While testing, stay on the test units.** Google's IDs earn nothing and
+   cannot get your account suspended; tapping your own live ads can.
+
+Two things worth knowing:
+
+* A brand-new AdMob app can answer "no ads to show" for a while — inventory has
+  to build up. It fills in on its own.
+* Once the app is live on Play, publish an **`app-ads.txt`** file (AdMob shows
+  the exact line under *Apps → app-ads.txt*) on the website named on your Play
+  listing. Without it, some advertisers will not bid.
+
 ## Data safety form
 
 Play asks what the app collects and shares. These are the answers that match
