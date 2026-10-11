@@ -1,5 +1,11 @@
 # Publishing on Google Play
 
+**What this file is:** the runbook for putting AI Calculator on Google Play —
+where the upload file comes from, which key signs it, every word and picture the
+store listing needs, the data-safety answers, and the order to do it in. Read it
+top to bottom the first time; after that, only *"Every update after that"*
+matters.
+
 The build that Play accepts is the **Android App Bundle** (`app-release.aab`).
 It is built by the same CI run as the APK and published on the rolling release
 together with it:
@@ -13,6 +19,77 @@ Locally, the same file comes from:
 ```bash
 ./gradlew bundleRelease        # → app/build/outputs/bundle/release/app-release.aab
 ```
+
+## Public or private repository — what actually changes
+
+Nothing in the app, the admin Worker, or the Play upload depends on the
+repository being public. Three things do change:
+
+| | Public (today) | Private |
+| --- | --- | --- |
+| **CI minutes** | unlimited and free | Free plan: 2,000 Linux minutes/month, then $0.006/min or runs are blocked at a $0 spend limit. A build here takes ~4½ minutes, so the free allowance is roughly **440 builds a month** |
+| **Release downloads** | `latest-build` links work for anyone, no login | links need a GitHub login, so **testers cannot install the APK by URL** |
+| **File links** (raw `worker.js`, this file) | open in any browser | need login (fine for you, not for a shared link) |
+| **The bundled signing key** | visible to everyone | hidden — but it is already in the git history, so make a fresh upload key for Play either way (see above) |
+| Play Console, Cloudflare Worker, app behaviour | — | unchanged |
+
+So the only real consequence is **how testers get the app**. Two ways to keep
+that working after switching to private:
+
+1. **Use Play's closed testing track** (which the 12-tester/14-day rule makes
+   unavoidable for a new personal account anyway). Testers open the Play link
+   you send them and install through the Play Store — no repository access
+   needed, and it works for the APK-side too because Play ships the `.aab`.
+2. **Or keep an APK link alive** by publishing builds to a second, always-public
+   repository (for example `m.calculator-releases`) from this workflow, or by
+   uploading the APK to Cloudflare R2 / any file host and sharing that URL.
+
+To switch: **Settings → General → Danger zone → Change repository visibility**.
+Everything under `admin/` keeps deploying exactly as before — the worker workflow
+runs inside whichever repository it lives in.
+
+## Copy-paste kit
+
+**Release notes** — *What's new* in Play Console (limit 500 characters):
+
+```
+First release.
+• Scientific calculator with history, fractions and exact results
+• Graphs: up to five functions, pan, zoom and trace
+• Solver, derivatives, integrals and series
+• Matrices, complex numbers, 250+ unit conversions
+• GST, income tax, EMI, BMI, interest, profit, bases, age
+• Ask AI (optional, your own key): type, photograph or attach
+• Light and dark themes, no sign-up, no ads, works offline
+```
+
+**Closed-test invitation** — send this to your 12 testers (WhatsApp, email,
+Slack — anything):
+
+```
+Hi! I'm testing my Android calculator app on Google Play before releasing it —
+could you help me out?
+
+1. Open this link on your Android phone: <PASTE YOUR CLOSED-TEST LINK>
+2. Tap "Become a tester", then "Install".
+3. Please keep it installed and open it at least once a day for the next two
+   weeks. Play requires 12 testers using an app for 14 days in a row before it
+   can be published, so please don't uninstall it in that time.
+4. If anything looks wrong or confusing, tell me — your replies are what makes
+   the next version better.
+
+It's free, no ads, and all the maths works offline. Thank you!
+```
+
+Where the link comes from: Play Console → **Testing → Closed testing → Testers**
+→ add the testers' Google accounts (or a Google Group) → copy the
+**"How testers join your test"** link.
+
+**Support email** — needed on the listing and in the privacy policy. Put the same
+address into `CONTACT` at the top of `admin/worker/worker.js`.
+
+**App category / tags** — *Tools* is the honest category; tags: Calculator,
+Utilities, Education.
 
 ## Read this first: the signing key
 
