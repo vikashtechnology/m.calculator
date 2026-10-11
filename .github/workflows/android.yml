@@ -149,6 +149,17 @@ jobs:
             gh issue create --title "$TITLE" --body "$BODY" || true
           fi
 
+      - name: Close the CI failure issue when the build is green
+        if: steps.tests.outcome == 'success' && steps.apk.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          NUMBERS="$(gh issue list --state open --search 'CI failure in:title' --json number --jq '.[].number')"
+          for n in $NUMBERS; do
+            gh issue close "$n" --comment "Build is green again (run ${GITHUB_RUN_ID}), closing automatically." || true
+          done
+
       - name: Fail the job if anything failed
         if: steps.tests.outcome == 'failure' || steps.apk.outcome == 'failure'
         run: exit 1
