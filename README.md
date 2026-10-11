@@ -26,6 +26,11 @@ and never touches the network.
 
 ## Features
 
+### Navigation
+The six tools live in a **left sidebar** — three lines of two tiles (Calc, Graph /
+Solve, Matrix / Units, Stats) — so the keypad keeps the full height of the screen.
+Tap a tile to switch; the back button returns to the calculator from any tool.
+
 ### Calculator pad
 * Full expression parser: `2+3(4+1)`, `2π`, `2sin(30)`, `3!`, `50%`, `10 mod 3`
 * Live preview of the answer while you type, plus alternate forms (`≈ 1/3`)
