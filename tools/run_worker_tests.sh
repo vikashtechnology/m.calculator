@@ -12,10 +12,15 @@ import sys
 worker_path = pathlib.Path("admin/worker/worker.js")
 worker = worker_path.read_text()
 
-# 1. module under test: the Worker with the dashboard HTML replaced by a marker
-start = worker.index("const DASHBOARD_HTML = `") + len("const DASHBOARD_HTML = `")
-end = worker.rindex("`;")
-module = worker[:start - len("const DASHBOARD_HTML = `")] + "const DASHBOARD_HTML = '<html>ok</html>';\n" + worker[end + 2:]
+# 1. module under test: the Worker with the two big HTML templates replaced by
+#    markers, so the test file stays about behaviour rather than markup.
+def stub(module, name, marker):
+    start = module.index(f"const {name} = `") + len(f"const {name} = `")
+    end = module.index("`;", start)
+    return module[:start - len(f"const {name} = `")] + f"const {name} = '{marker}';\n" + module[end + 2:]
+
+module = stub(worker, "DASHBOARD_HTML", "<html>ok</html>")
+module = stub(module, "PRIVACY_HTML", "<html>privacy</html>")
 pathlib.Path("admin/worker/test/module-under-test.mjs").write_text(module)
 
 

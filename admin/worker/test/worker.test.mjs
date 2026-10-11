@@ -109,6 +109,13 @@ res = await worker.fetch(new Request("https://x.workers.dev/"), env);
 const html = await res.text();
 check("dashboard served", res.status === 200 && html.includes("<html>ok</html>"));
 
+// the privacy policy page the Play listing points at
+res = await worker.fetch(new Request("https://x.workers.dev/privacy"), env);
+const privacy = await res.text();
+check("privacy page served", res.status === 200 && privacy.includes("privacy"),
+      String(res.status));
+check("privacy page is html", (res.headers.get("content-type") || "").includes("text/html"));
+
 // solve without a key
 res = await worker.fetch(new Request("https://x.workers.dev/v1/solve", {
   method: "POST", headers: { authorization: "Bearer nope" },

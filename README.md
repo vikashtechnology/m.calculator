@@ -256,6 +256,23 @@ foreground and the monochrome glyph are scaled to 0.80 and 0.90 so that the AI
 badge survives a circular mask; `assets/app-icon.svg` is the source the drawing
 follows, kept for reference.
 
+## Publishing to Google Play
+
+The Android App Bundle (`app-release.aab`) is built by CI on every push and sits
+next to the APK on the `latest-build` release:
+
+```bash
+./gradlew bundleRelease        # app/build/outputs/bundle/release/app-release.aab
+```
+
+`compileSdk`/`targetSdk` are **36** because Play requires new apps and updates to
+target Android 16 (API 36) since 31 August 2026. The store listing text, icon,
+feature graphic, screenshots, the data-safety answers, the signing-key decision
+and the version-bumping flow are all written out in [`PLAY.md`](PLAY.md). The
+Play icon (512×512), feature graphic (1024×500) and three phone screenshots come
+from `tools/make_icons.py`, and the privacy policy Play asks for is served by the
+admin Worker at `/privacy`.
+
 ## Colours and themes
 
 The palette lives entirely in `ui/theme/Theme.kt` — both the dark and the light

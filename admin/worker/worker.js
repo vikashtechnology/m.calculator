@@ -80,6 +80,11 @@ export default {
         headers: { "content-type": "text/html; charset=utf-8" },
       });
     }
+    if (url.pathname === "/privacy" || url.pathname === "/privacy.html") {
+      return new Response(PRIVACY_HTML, {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      });
+    }
     if (url.pathname === "/health") {
       return handleHealth(env);
     }
@@ -388,6 +393,7 @@ async function handleHealth(env) {
     },
     endpoints: {
       dashboard: "GET /",
+      privacy: "GET /privacy  (the URL for the Play Store listing)",
       stats: "GET /v1/stats?days=30&token=…",
       events: "POST /v1/events",
       solve: "POST /v1/solve  (optional; the app uses the user's own key)",
@@ -456,6 +462,88 @@ async function handleStats(request, env, url) {
     return json({ error: "database error", detail: String(error) }, 500);
   }
 }
+
+/**
+ * The privacy policy. Google Play requires a reachable URL for an app that
+ * sends anything off the device, and the Worker is already deployed, so
+ * https://<your-worker>.workers.dev/privacy is that URL. Edit CONTACT below to
+ * the support email you use on the Play listing.
+ */
+const CONTACT = "the support email on the app's Google Play listing";
+
+const PRIVACY_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Calculator — privacy policy</title>
+<style>
+  :root { color-scheme: light dark }
+  body { margin: 0 auto; max-width: 720px; padding: 32px 20px 64px;
+         font: 16px/1.65 -apple-system, "Segoe UI", Roboto, sans-serif;
+         background: #0d0f1a; color: #e7e9f3 }
+  @media (prefers-color-scheme: light) { body { background: #f5f6fb; color: #171a2b } }
+  h1 { font-size: 30px; margin: 0 0 4px }
+  h2 { font-size: 19px; margin: 30px 0 6px }
+  .sub { opacity: .75; margin: 0 0 26px }
+  code { background: rgba(140,130,255,.16); padding: 1px 6px; border-radius: 5px }
+  ul { padding-left: 22px }
+</style>
+</head>
+<body>
+<h1>AI Calculator — privacy policy</h1>
+<p class="sub">Last updated: 11 October 2026</p>
+
+<p>AI Calculator is an offline calculator for Android. It has no accounts, no
+sign-in and no advertising. This page explains the only two things that can ever
+leave your device, and how to switch them off.</p>
+
+<h2>1. Anonymous usage counts (optional, on by default)</h2>
+<p>The app can send anonymous counts — how many times it was opened, how many
+calculations were made and how many AI questions were answered — together with
+the date, the app version and the Android API level. Each install is identified
+by a random string created on the device; it is not an account and cannot be
+traced back to you.</p>
+<ul>
+  <li><b>Never sent:</b> the expressions you type, your results, your history,
+      files, photos, contacts, location or any device identifier.</li>
+  <li><b>Switch:</b> turn the counters off in the app under
+      <code>☰ → Anonymous usage stats</code>. Nothing is sent while it is off,
+      and anything still waiting is deleted.</li>
+  <li><b>Why:</b> the totals tell the developer which features are used, so the
+      app can be improved.</li>
+</ul>
+
+<h2>2. Ask AI (optional, only when you use it)</h2>
+<p>Ask AI is off until you paste your own Google Gemini API key into
+<code>☰ → Ask AI → ⚙</code>. The key is stored on your device only. When you send
+a question, the text you typed and any image or file you attached are sent to
+Google's Gemini API to be answered, under
+<a href="https://ai.google.dev/gemini-api/terms">Google's Gemini API terms</a>
+and <a href="https://policies.google.com/privacy">Google's privacy policy</a>.
+The chat has no memory: each question is sent on its own, and nothing is stored
+on a server by this app.</p>
+<ul>
+  <li><b>Camera or files:</b> used only for the question you are sending at that
+      moment.</li>
+  <li><b>Delete:</b> remove the key in the app, and nothing more can be sent.</li>
+</ul>
+
+<h2>3. Everything else stays on the phone</h2>
+<p>Your history, variables, memory and settings are stored in the app's private
+storage on your device. They are not uploaded anywhere. Uninstalling the app
+removes them.</p>
+
+<h2>4. Children</h2>
+<p>The app is a general-purpose calculator, not directed at children. It does not
+knowingly collect personal information from anyone, of any age.</p>
+
+<h2>5. Contact</h2>
+<p>Questions about this policy, or a request to have anonymous counts deleted:
+write to ${CONTACT}.</p>
+</body>
+</html>
+`;
 
 const DASHBOARD_HTML = `<!doctype html>
 <html lang="en">

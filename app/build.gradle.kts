@@ -13,11 +13,14 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.advanceai.calculator"
-    compileSdk = 34
+    // Google Play requires new apps and updates to target API 36 (Android 16)
+    // since 31 August 2026. compileSdk follows targetSdk so the APIs the app is
+    // written against are the ones it declares.
+    compileSdk = 36
 
-    // "Continue with Google" only works for a build whose signing certificate is
-    // registered in the Google Cloud console, so the project signs every build
-    // with the same committed key. Its SHA-1 is in app/signing/fingerprints.txt.
+    // Every build is signed with the committed key so its fingerprint stays
+    // stable (Google Sign-In registration and Play upload both care about that).
+    // Its SHA-1 is in app/signing/fingerprints.txt.
     val bundledKeystore = rootProject.file("app/signing/mcalculator.p12")
     val telemetryUrl: String = (findProperty("telemetryUrl") as String?) ?: ""
     val geminiKey: String = (findProperty("geminiApiKey") as String?) ?: ""
@@ -26,9 +29,11 @@ android {
     defaultConfig {
         applicationId = "com.advanceai.calculator"
         minSdk = 24
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 36
+        // Play needs a versionCode that goes *up* with every upload. CI passes
+        // -PversionCode=… so a release can bump it without editing files.
+        versionCode = (findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
+        versionName = (findProperty("versionName") as String?) ?: "1.0.0"
         resourceConfigurations += listOf("en")
         vectorDrawables { useSupportLibrary = true }
         // Where the anonymous usage counts go (the Cloudflare Worker in
@@ -63,8 +68,8 @@ android {
 
     buildTypes {
         debug {
-            // No applicationIdSuffix: the package name must match the OAuth
-            // client registered for Google Sign-In.
+            // No applicationIdSuffix: debug and release share one package name,
+            // so a debug build installs straight over the released app.
             versionNameSuffix = "-debug"
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("bundled")

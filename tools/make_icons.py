@@ -466,6 +466,142 @@ def layers_sheet() -> Image.Image:
     return sheet
 
 
+# --------------------------------------------------------------------------- #
+# Google Play store graphics
+# --------------------------------------------------------------------------- #
+def feature_graphic() -> Image.Image:
+    """The 1024x500 banner for the Play listing: icon, name, what it does."""
+    W, H = 1024, 500
+    sheet = Image.new("RGB", (W, H), BG_TOP)
+    strip = Image.new("RGB", (1, H))
+    for y in range(H):
+        t = y / (H - 1)
+        strip.putpixel((0, y), tuple(int(BG_TOP[c] + (BG_BOTTOM[c] - BG_TOP[c]) * t) for c in range(3)))
+    sheet.paste(strip.resize((W, H), Image.NEAREST), (0, 0))
+
+    glow = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(glow).ellipse((-W * 0.15, -H * 0.7, W * 0.55, H * 0.75), fill=70)
+    glow = glow.filter(ImageFilter.GaussianBlur(90))
+    sheet = Image.composite(Image.new("RGB", (W, H), (44, 46, 52)), sheet, glow)
+
+    icon = tile(260)
+    shadow = Image.new("RGBA", (340, 340), (0, 0, 0, 0))
+    dark = Image.new("RGBA", icon.size, (0, 0, 0, 200))
+    dark.putalpha(icon.getchannel("A").point(lambda v: int(v * 0.7)))
+    shadow.alpha_composite(dark, (40, 46))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(26))
+    sheet.paste(shadow, (58, 78), shadow)
+    sheet.paste(icon, (98, 108), icon)
+
+    draw = ImageDraw.Draw(sheet)
+    draw.text((410, 168), "AI Calculator", font=font(62), fill=(246, 245, 252))
+    draw.text((412, 244), "Graphing · matrices · calculus · units", font=font(27, bold=False),
+              fill=(196, 199, 214))
+    draw.text((412, 288), "everyday tools · Ask AI", font=font(27, bold=False),
+              fill=(196, 199, 214))
+    draw.rounded_rectangle((412, 344, 560, 352), radius=4, fill=(255, 122, 0))
+    return sheet
+
+
+CARDS = [
+    {
+        "title": "AI Calculator",
+        "subtitle": "Calculus · matrices · graphs · units",
+        "bullets": [
+            "Solve, differentiate and integrate",
+            "Plot up to five functions",
+            "Matrices, complex numbers, 250+ units",
+            "GST, EMI, BMI and other everyday tools",
+            "Ask AI: type, photograph or attach",
+            "Offline maths — no sign-up required",
+        ],
+        "accent": ACCENT_TOP,
+    },
+    {
+        "title": "Solve anything",
+        "subtitle": "from algebra to calculus",
+        "bullets": [
+            "Solve equations for x",
+            "Derivatives and definite integrals",
+            "Σ and Π series, limits at a point",
+            "Fraction and exact-form results",
+            "History of every calculation",
+            "Works without a connection",
+        ],
+        "accent": (94, 220, 255),
+    },
+    {
+        "title": "Ask AI",
+        "subtitle": "your own Gemini key, no account",
+        "bullets": [
+            "Type the question, or",
+            "Photograph it with the camera",
+            "Attach a picture or a PDF",
+            "Step-by-step answers",
+            "No chat history is kept",
+            "Everyday tools built in",
+        ],
+        "accent": (255, 138, 0),
+    },
+]
+
+
+def marketing_shot(spec: dict) -> Image.Image:
+    """One 1080x1920 listing card, drawn in the app's own palette.
+
+    Play wants at least two phone screenshots. These are generated so they can be
+    refreshed whenever the app changes; screenshots taken on a real device are
+    even better and can be uploaded instead.
+    """
+    W, H = 1080, 1920
+    sheet = Image.new("RGB", (W, H), BG_TOP)
+    strip = Image.new("RGB", (1, H))
+    for y in range(H):
+        t = y / (H - 1)
+        strip.putpixel((0, y), tuple(int(BG_TOP[c] + (BG_BOTTOM[c] - BG_TOP[c]) * t) for c in range(3)))
+    sheet.paste(strip.resize((W, H), Image.NEAREST), (0, 0))
+
+    glow = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(glow).ellipse((-W * 0.4, -H * 0.25, W * 1.1, H * 0.45), fill=64)
+    glow = glow.filter(ImageFilter.GaussianBlur(120))
+    sheet = Image.composite(Image.new("RGB", (W, H), (46, 48, 55)), sheet, glow)
+
+    icon = tile(420)
+    shadow = Image.new("RGBA", (540, 540), (0, 0, 0, 0))
+    dark = Image.new("RGBA", icon.size, (0, 0, 0, 205))
+    dark.putalpha(icon.getchannel("A").point(lambda v: int(v * 0.72)))
+    shadow.alpha_composite(dark, (60, 66))
+    blurred = shadow.filter(ImageFilter.GaussianBlur(34))
+    sheet.paste(blurred, (270, 250), blurred)
+    sheet.paste(icon, (330, 310), icon)
+
+    draw = ImageDraw.Draw(sheet)
+    title_font = font(72)
+    width = draw.textlength(spec["title"], font=title_font)
+    draw.text(((W - width) / 2, 880), spec["title"], font=title_font, fill=(248, 247, 253))
+
+    sub_font = font(34, bold=False)
+    width = draw.textlength(spec["subtitle"], font=sub_font)
+    draw.text(((W - width) / 2, 976), spec["subtitle"], font=sub_font, fill=(198, 201, 216))
+
+    # Bullets shrink to fit the card instead of running off its edge.
+    left = 250
+    limit = W - 110
+    y = 1130
+    for line in spec["bullets"]:
+        size = 34
+        while size > 22 and left + 64 + draw.textlength(line, font=font(size, bold=False)) > limit:
+            size -= 1
+        bullet_font = font(size, bold=False)
+        dot = size * 0.4
+        draw.ellipse((left, y + size * 0.42, left + dot, y + size * 0.42 + dot), fill=spec["accent"])
+        draw.text((left + 64, y), line, font=bullet_font, fill=(226, 228, 238))
+        y += int(size * 2.35)
+
+    draw.rounded_rectangle((478, 1720, 602, 1732), radius=6, fill=spec["accent"])
+    return sheet
+
+
 def main() -> int:
     total = 0
     for density, size in DENSITIES.items():
@@ -480,7 +616,12 @@ def main() -> int:
     total += write(tile(512), ASSETS / "play-store-icon-512.png")
     total += write(preview(), ASSETS / "app-icon-preview.png")
     total += write(layers_sheet(), ASSETS / "icon-layers.png")
-    print("  assets/play-store-icon-512.png, assets/app-icon-preview.png, assets/icon-layers.png")
+    total += write(feature_graphic(), ASSETS / "play-feature-graphic-1024x500.png")
+    for index, spec in enumerate(CARDS, start=1):
+        total += write(marketing_shot(spec), ASSETS / f"play-screenshot-{index}-1080x1920.png")
+    print("  assets/play-store-icon-512.png, assets/app-icon-preview.png,")
+    print("  assets/icon-layers.png, assets/play-feature-graphic-1024x500.png,")
+    print(f"  assets/play-screenshot-1..{len(CARDS)}-1080x1920.png")
     print(f"done — {total:,} bytes of icons")
     return 0
 

@@ -21,3 +21,6 @@ admin/worker/test/module-under-test.mjs
 
 # Python bytecode from the helper scripts
 tools/__pycache__/
+
+# Local signing credentials (see PLAY.md)
+keystore.properties
