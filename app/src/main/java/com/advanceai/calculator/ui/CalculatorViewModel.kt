@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.advanceai.calculator.data.HistoryEntry
+import com.advanceai.calculator.ai.GeminiClient
 import com.advanceai.calculator.data.Prefs
 import com.advanceai.calculator.data.Telemetry
 import com.advanceai.calculator.engine.AngleMode
@@ -121,6 +122,8 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         Telemetry.install(app)
+        // Lets GeminiClient read the key the user pasted into Ask AI.
+        GeminiClient.install(app)
         // One anonymous count per app start; the results stay on the phone.
         Telemetry.record(app, Telemetry.EVENT_APP_OPEN)
     }

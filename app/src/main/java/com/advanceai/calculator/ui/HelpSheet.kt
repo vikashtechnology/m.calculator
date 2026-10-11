@@ -90,10 +90,10 @@ fun HelpSheet(onDismiss: () -> Unit) {
                     "Tap the Ask AI card at the top of the pad, or the Ask AI row in the menu.",
                     "Upload a photo, a PDF or a text file of a question, then press Solve this question.",
                     "It only solves the question in the file you upload, with the steps.",
-                    "With Google sign-in: tap Continue with Google once and the phone's own account",
-                    "picker opens — no key to paste and no password page; the AI runs under that account.",
-                    "Web-page mode signs in to Puter instead; its Google button opens Google's web page,",
-                    "which cannot list the accounts on the phone.",
+                    "Ask AI runs on your own free Gemini key: the first time, paste one (Get a free key",
+                    "takes you to Google AI Studio). The key stays on this phone and can be removed there.",
+                    "No account and no sign-in; the key is only sent to Google with the question.",
+                    "No key? The card also offers the free Puter page instead.",
                     "Ask AI needs internet; everything else in the app works offline."
                 )
             )

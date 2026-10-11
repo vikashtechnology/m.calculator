@@ -29,8 +29,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
- * The hero call-to-action for "Ask AI" on the calculator pad: photograph or
- * upload a question and have Puter solve it.
+ * The hero call-to-action for "Ask AI" on the calculator pad: upload a question
+ * and have Gemini solve it with the user's own key.
  */
 @Composable
 fun AiHeroCard(

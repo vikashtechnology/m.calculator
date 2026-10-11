@@ -69,13 +69,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.advanceai.calculator.ui.components.AiHeroMenuRow
 import com.advanceai.calculator.ui.screens.AiNativeScreen
-import com.advanceai.calculator.ui.screens.AiScreen
 import com.advanceai.calculator.ui.screens.ConverterScreen
 import com.advanceai.calculator.ui.screens.GraphScreen
 import com.advanceai.calculator.ui.screens.MatrixScreen
 import com.advanceai.calculator.ui.screens.PadScreen
 import com.advanceai.calculator.ui.screens.SolverScreen
-import com.advanceai.calculator.ai.GeminiClient
 import com.advanceai.calculator.data.Telemetry
 import com.advanceai.calculator.ui.screens.EverydayTool
 import com.advanceai.calculator.ui.screens.StatsScreen
@@ -151,19 +149,13 @@ fun AppRoot(viewModel: CalculatorViewModel) {
 
             Box(modifier = Modifier.fillMaxSize()) {
                 if (aiOpen) {
-                    // With a Gemini key the whole thing runs natively, so the
-                    // Google account picker is the phone's own — no web login.
-                    if (GeminiClient.isConfigured) {
-                        AiNativeScreen(
-                            onClose = { aiOpen = false },
-                            showMessage = showMessage
-                        )
-                    } else {
-                        AiScreen(
-                            onClose = { aiOpen = false },
-                            showMessage = showMessage
-                        )
-                    }
+                    // Always the native screen: it asks for the user's own
+                    // Gemini key when there is none, and offers the Puter page
+                    // from inside that card for anyone who prefers no key.
+                    AiNativeScreen(
+                        onClose = { aiOpen = false },
+                        showMessage = showMessage
+                    )
                 } else if (toolOpen != null) {
                     ToolsScreen(
                         tool = toolOpen!!,

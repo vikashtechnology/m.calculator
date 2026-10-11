@@ -98,42 +98,38 @@ between them. Every field recalculates as you type — there is no Solve button.
 | **Bases** | Convert between binary, octal, decimal, hex and any base from 2 to 36 |
 | **Age** | Age in years/months/days plus total days/weeks/months and days to the next birthday |
 
-### Ask AI and Google (optional, needs internet)
-Ask AI can run three ways; the build picks the best one it has:
+### Ask AI (bring your own key — nothing to sign up for)
+The hero card at the top of the pad opens **Ask AI**: upload a photo, a PDF or a
+text file of a question and it comes back solved, with the working.
 
-**1. Through your own Worker (best for users — Google OAuth)**
-Set `AI_PROXY_URL` (the Worker from `admin/worker`) and `GOOGLE_WEB_CLIENT_ID`:
+It runs on a **Gemini API key the user pastes in themselves**:
 
-* the user taps **Continue with Google** and the phone's own account picker opens
-  (Credential Manager — the accounts already on the device, no password page)
-* the app sends the ID token with the question; the **Worker verifies that token
-  against Google's published keys** and only then asks Gemini with the key it
-  holds as a secret — so no key is ever in the APK and users have nothing to set up
-* the same Worker also serves the dashboard, so there is one deploy for both
+* the first time, Ask AI shows a card: paste a key, press *Save the key*
+* *Get a free key* opens `aistudio.google.com/apikey` in the browser — one click
+  with any Google account, no card, no sign-up form
+* the key is kept in the app's private storage, sent only to Google with the
+  question, and can be deleted from the same card at any time
+* nobody signs in to anything, no account is created, and nothing about the user
+  reaches this app's author
 
-**2. Straight from the app (a key in the build)**
-Set `GEMINI_API_KEY` (or `-PgeminiApiKey=`): the app calls Gemini directly. Simple,
-and the key is yours alone — users still only need the app. Use this when you have
-not deployed the Worker.
+Builders can still ship a fallback: with `GEMINI_API_KEY` (or `-PgeminiApiKey=`)
+the app calls Gemini with that key when the user has not saved one, and with
+`AI_PROXY_URL` it hands the question to the Worker from `admin/worker`, which
+verifies the user's Google sign-in and holds the key itself — that OAuth mode is
+there but off unless you configure it. The bundled Puter page
+(`assets/ai/index.html`) stays as a no-key-at-all option, reachable from the key
+card; note that Puter's own *Sign in with Google* opens Google's web page, which
+cannot list the accounts on the phone.
 
-**3. The bundled Puter page (no configuration at all)**
-Without either, `assets/ai/index.html` runs Puter.js in a WebView: sign in with a
-Puter account or *Continue as guest*. Note that Puter's own *Sign in with Google*
-opens **Google's web sign-in page** — Google deliberately keeps the phone's accounts
-out of embedded browsers, so that page asks for the password again and can refuse
-the browser outright. That is the case the Worker mode above replaces.
+Optional build properties:
 
-To use Google sign-in at all, register the signing certificate's SHA-1 (see
-`app/signing/fingerprints.txt`) for the package name `com.advanceai.calculator` in
-the Google Cloud console → *APIs & Services* → *Credentials* → *Create OAuth client
-ID* → **Android**, create a second client ID of type **Web**, then:
-
-* app builds: `GOOGLE_WEB_CLIENT_ID` secret (or `-PgoogleWebClientId=`)
-* Worker deploys: the same Web client ID (`wrangler secret put GOOGLE_WEB_CLIENT_ID`)
-  so it can check the tokens it receives
-
-Every build is signed with the key in `app/signing/`, so that fingerprint never
-changes and Android updates install straight over the previous version.
+```bash
+-PaiProxyUrl=…          # Ask AI through your Worker (Google sign-in, key on the Worker)
+-PgoogleWebClientId=…   # needed only for that Worker mode
+-PgeminiApiKey=…        # a key that ships with the build, used when the user has none
+-PgeminiModel=…         # optional model override, default gemini-2.5-flash
+-PtelemetryUrl=…        # sends anonymous usage counts to the admin dashboard
+```
 
 ### Usage dashboard (optional)
 `admin/worker` holds a Cloudflare Worker that serves a small read-only dashboard:
@@ -209,7 +205,7 @@ app/src/main/java/com/advanceai/calculator/
 ├── engine/          pure Kotlin math: lexer, parser, evaluator, complex,
 │                    matrix, calculus, units, formatter (no Android imports)
 ├── data/            SharedPreferences store for settings, variables, history,
-│                    and the anonymous usage counters
+│                    the user's own API key and the anonymous usage counters
 ├── ai/              Google sign-in (Credential Manager) and the Gemini client
 ├── ui/              Compose UI: view model, keypads, sheets, theme
 │   ├── components/  keypad grid and display panel

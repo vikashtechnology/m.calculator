@@ -1,5 +1,6 @@
 package com.advanceai.calculator.ui.screens
 
+import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -53,6 +54,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.advanceai.calculator.ai.GeminiClient
 import com.advanceai.calculator.ai.GoogleSignIn
+import com.advanceai.calculator.data.UserKeys
 import kotlinx.coroutines.launch
 
 /**
@@ -79,6 +81,17 @@ fun AiNativeScreen(
     var googleBusy by remember { mutableStateOf(false) }
     // Proxy mode means the Worker checks a Google sign-in before it answers.
     var signedIn by remember { mutableStateOf(GoogleSignIn.isSignedIn(context)) }
+    // The user's own Gemini key: no account, no sign-up, just a key they paste.
+    var keySaved by remember { mutableStateOf(GeminiClient.hasKey) }
+    var keyDraft by remember { mutableStateOf("") }
+    var keyCard by remember { mutableStateOf(false) }
+    var usePuter by remember { mutableStateOf(false) }
+
+    if (usePuter) {
+        // The zero-setup path for anyone who would rather not bring a key.
+        AiScreen(onClose = onClose, showMessage = showMessage, modifier = modifier)
+        return
+    }
 
     BackHandler { onClose() }
 
@@ -96,6 +109,23 @@ fun AiNativeScreen(
             answer = null
             error = null
         }
+    }
+
+    fun saveKey() {
+        val key = keyDraft.trim()
+        if (key.isEmpty()) {
+            showMessage("Paste the key first")
+            return
+        }
+        UserKeys.setGeminiKey(context, key)
+        keyDraft = ""
+        keySaved = true
+        keyCard = false
+        error = null
+        showMessage(
+            if (UserKeys.looksValid(key)) "Key saved — Ask AI is ready"
+            else "Saved. If that key is wrong, Gemini will say so when you ask."
+        )
     }
 
     fun signInWithGoogle() {
@@ -140,23 +170,38 @@ fun AiNativeScreen(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.weight(1f)
             )
-            Surface(
-                onClick = { signInWithGoogle() },
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text(
-                    text = when {
-                        googleBusy -> "Signing in…"
-                        googleEmail.isNotEmpty() -> "Google ✓"
-                        else -> "Google"
-                    },
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                )
+            if (GeminiClient.usesProxy) {
+                Surface(
+                    onClick = { signInWithGoogle() },
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = when {
+                            googleBusy -> "Signing in…"
+                            googleEmail.isNotEmpty() -> "Google ✓"
+                            else -> "Google"
+                        },
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            } else {
+                Surface(
+                    onClick = { keyCard = true },
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (GeminiClient.usesUserKey) "Key ✓" else "API key",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
             }
         }
 
@@ -179,6 +224,32 @@ fun AiNativeScreen(
                     busy = googleBusy,
                     configured = GoogleSignIn.isConfigured,
                     onSignIn = { signInWithGoogle() }
+                )
+            } else if (!keySaved || keyCard) {
+                ApiKeyCard(
+                    draft = keyDraft,
+                    onDraftChange = { keyDraft = it },
+                    savedKey = if (GeminiClient.usesUserKey) GeminiClient.apiKey else "",
+                    onSave = { saveKey() },
+                    onClear = {
+                        UserKeys.clearGeminiKey(context)
+                        keySaved = GeminiClient.hasKey
+                        keyDraft = ""
+                        showMessage("Your key was removed")
+                    },
+                    onOpenStudio = {
+                        val opened = runCatching {
+                            context.startActivity(
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://aistudio.google.com/apikey")
+                                )
+                            )
+                        }.isSuccess
+                        if (!opened) showMessage("Open aistudio.google.com/apikey in a browser")
+                    },
+                    onUsePuter = { usePuter = true },
+                    hasBuiltInKey = GeminiClient.apiKey.isNotBlank() && !GeminiClient.usesUserKey
                 )
             } else {
             val current = picked
@@ -294,6 +365,11 @@ fun AiNativeScreen(
                         busy = false
                         when {
                             result.ok -> answer = result.text
+                            result.error == "no_key" -> {
+                                keySaved = false
+                                keyCard = true
+                                showMessage("Add your Gemini API key to ask a question")
+                            }
                             result.error == "sign_in_required" -> {
                                 signedIn = false
                                 showMessage("Your sign-in was not accepted — tap Continue with Google")
@@ -482,4 +558,92 @@ private fun formatSize(bytes: Int): String = when {
     bytes >= 1024 * 1024 -> "${"%.1f".format(bytes / 1024.0 / 1024.0)} MB"
     bytes >= 1024 -> "${bytes / 1024} KB"
     else -> "$bytes B"
+}
+
+/**
+ * "Bring your own key": the user pastes their own Gemini API key once. No
+ * account, no sign-up, and the key never leaves the phone except to Google.
+ */
+@Composable
+private fun ApiKeyCard(
+    draft: String,
+    onDraftChange: (String) -> Unit,
+    savedKey: String,
+    onSave: () -> Unit,
+    onClear: () -> Unit,
+    onOpenStudio: () -> Unit,
+    onUsePuter: () -> Unit,
+    hasBuiltInKey: Boolean
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text("Use your own Gemini key", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Ask AI runs on your own free key from Google AI Studio. " +
+                    "It takes a minute, no account to create, and the key stays " +
+                    "stored on this phone.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (savedKey.isNotBlank()) {
+                Text(
+                    text = "Your saved key: ${UserKeys.describe(savedKey)}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onClear) { Text("Remove the key") }
+                    TextButton(onClick = onSave) { Text("Save a different key") }
+                }
+            }
+
+            OutlinedTextField(
+                value = draft,
+                onValueChange = onDraftChange,
+                label = { Text(if (savedKey.isBlank()) "Gemini API key" else "New key") },
+                placeholder = { Text("AIza…") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (draft.isNotBlank() && !UserKeys.looksValid(draft)) {
+                Text(
+                    text = "That does not look like an AI Studio key (they start with AIza). " +
+                        "It can still be saved if you know it is right.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onSave, enabled = draft.isNotBlank()) { Text("Save the key") }
+                OutlinedButton(onClick = onOpenStudio) { Text("Get a free key") }
+            }
+
+            if (hasBuiltInKey) {
+                Text(
+                    text = "This build already has a key, so Ask AI works without one of your own.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Text(
+                text = "The key is only sent to Google's Gemini API with your question. " +
+                    "Delete it here any time.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            TextButton(onClick = onUsePuter) {
+                Text("No key? Use the free Puter page instead")
+            }
+        }
+    }
 }

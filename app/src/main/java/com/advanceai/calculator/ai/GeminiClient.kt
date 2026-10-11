@@ -1,8 +1,10 @@
 package com.advanceai.calculator.ai
 
+import android.content.Context
 import android.util.Base64
 import android.util.Log
 import com.advanceai.calculator.BuildConfig
+import com.advanceai.calculator.data.UserKeys
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -19,15 +21,10 @@ import java.net.URLEncoder
  * account picker instead of Google's web login page: there is no embedded
  * browser for Google to refuse.
  *
- * Two ways to reach the model, picked at build time:
- *
- * 1. Through the stats Worker ([proxyUrl]): the user signs in with Google and
- *    the Worker — which holds the API key as a secret — checks that sign-in and
- *    asks Gemini. Users need no key at all; this is the "just tap Continue with
- *    Google" mode.
- * 2. Directly with a key baked into the build ([apiKey]).
- *
- * With neither, the bundled Puter page is used instead.
+ * The key is the user's own: they paste it once on the Ask AI screen (see
+ * [UserKeys]) and it is kept in the app's private storage. Nothing to sign up
+ * for, nothing tied to an account. A key baked into the build, or the optional
+ * Worker from `admin/worker`, are only fallbacks for builds that ship one.
  */
 object GeminiClient {
 
@@ -37,7 +34,32 @@ object GeminiClient {
     /** Files above this size are refused before anything is uploaded. */
     const val MaxAttachmentBytes = 15 * 1024 * 1024
 
-    val apiKey: String = BuildConfig.GEMINI_API_KEY
+    private var appContext: Context? = null
+
+    /** Called once from the app so the user's saved key can be read. */
+    fun install(context: Context) {
+        appContext = context.applicationContext
+    }
+
+    /** The user's own key when they saved one, otherwise the one in the build. */
+    val apiKey: String
+        get() {
+            val context = appContext
+            val personal = if (context != null) UserKeys.geminiKey(context) else ""
+            return personal.ifBlank { BuildConfig.GEMINI_API_KEY }
+        }
+
+    /** True when the key came from the user rather than the build. */
+    val usesUserKey: Boolean
+        get() {
+            val context = appContext ?: return false
+            return UserKeys.geminiKey(context).isNotBlank()
+        }
+
+    /** True when Ask AI has a key to work with at all. */
+    val hasKey: Boolean
+        get() = apiKey.isNotBlank()
+
     val model: String = BuildConfig.GEMINI_MODEL.ifBlank { "gemini-2.5-flash" }
 
     /** The Worker that holds the key and checks Google sign-ins, if any. */
@@ -47,9 +69,9 @@ object GeminiClient {
     val usesProxy: Boolean
         get() = proxyUrl.isNotBlank()
 
-    /** True when Ask AI can run natively at all. */
+    /** True when Ask AI can answer at all. */
     val isConfigured: Boolean
-        get() = usesProxy || apiKey.isNotBlank()
+        get() = usesProxy || hasKey
 
     /** A file the user picked: the bytes are what actually gets sent. */
     data class Attachment(
@@ -160,7 +182,7 @@ object GeminiClient {
     }
 
     private fun request(question: String, attachment: Attachment?): Answer {
-        if (!isConfigured) return Answer(ok = false, error = "not_configured")
+        if (apiKey.isBlank()) return Answer(ok = false, error = "no_key")
         if (attachment != null && attachment.bytes.size > MaxAttachmentBytes) {
             return Answer(ok = false, error = "That file is larger than 15 MB. Try a screenshot instead.")
         }

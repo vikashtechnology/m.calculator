@@ -4,8 +4,12 @@ One Worker does two jobs:
 
 1. a read-only dashboard for Ai Calculator: installs, active users, and
    calculations and AI questions per day;
-2. **the Ask AI backend**: it holds the Gemini key and answers questions for
-   signed-in users, so the key never ships inside the APK.
+2. **optionally, the Ask AI backend**: it holds the Gemini key and answers
+   questions for signed-in users, so the key never ships inside the APK.
+
+> Ask AI normally uses a key the *user* pastes in (see the README). The second
+> job below is the alternative for builds that would rather not ask users for a
+> key at all — leave the two AI secrets unset and the Worker is just a dashboard.
 
 It runs entirely on Cloudflare — one Worker plus one D1 (SQLite) database, both
 free-tier friendly, no other service to sign up for.
