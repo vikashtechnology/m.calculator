@@ -21,8 +21,9 @@ handles real and complex numbers, matrices, calculus, units and statistics.
    and download the `m-calculator-apk` artifact (contains both the debug and
    release APKs).
 
-Requirements: Android 7.0 (API 24) or newer. The app requests **no permissions**
-and never touches the network.
+Requirements: Android 7.0 (API 24) or newer. Everything except **Ask AI** runs
+completely offline — the app asks for a single permission, `INTERNET`, and only
+the Ask AI screen ever uses it.
 
 ## Features
 
@@ -78,6 +79,25 @@ type `12 km to mi` and press Convert.
 Paste numbers and get count, sum, mean, median, quartiles, min/max, range, sample
 and population standard deviation and variance.
 
+### Ask AI (optional, needs internet)
+The hero card at the top of the pad opens **Ask AI**, which solves a question you
+upload — a photo, a PDF or a text file — and shows the working. It is powered by
+[Puter.js](https://developer.puter.com/), which supplies both the account and the
+model, so the app needs no API keys and no backend of its own:
+
+* sign in with a Puter account, or create a temporary one with *Continue as guest*
+* upload a question, choose whether you want the steps, and press **Solve this question**
+* the prompt is deliberately narrow: the model is told to solve *only* the
+  question in the file, and to say so when the upload holds no maths question
+* photos go to the model directly; PDFs are read with pdf.js (first five pages);
+  `.txt`/`.md`/`.csv` files are read as text
+* sign-in opens a popup, which the app hosts in its own window, because that is
+  how Puter hands the token back
+
+The page lives in `app/src/main/assets/ai/index.html` and is served to the WebView
+over `https://appassets.androidplatform.net` by `WebViewAssetLoader` — a `file://`
+page has no origin Puter can sign in with.
+
 ## Light and dark
 
 The app follows your phone theme — light in the day, dark at night — with a
@@ -115,6 +135,7 @@ app/src/main/java/com/vikashtechnology/mcalculator/
 │   ├── components/  keypad grid and display panel
 │   └── screens/     pad, graph, solver, matrix, units, stats
 └── MainActivity.kt
+app/src/main/assets/ai/  the Ask AI page (HTML + Puter.js glue, no build step)
 app/src/test/        JUnit suite for the engine
 tools/               icon generator and the Python reference oracle
 ```

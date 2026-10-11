@@ -13,8 +13,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
@@ -34,16 +34,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.sp
 import com.vikashtechnology.mcalculator.ui.CalcUiState
 
@@ -65,8 +66,8 @@ fun DisplayPanel(
     modifier: Modifier = Modifier
 ) {
     val colors = MaterialTheme.colorScheme
-    val keyboard = LocalSoftwareKeyboardController.current
     val scroll = rememberScrollState()
+    var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
 
     var fieldValue by remember {
         mutableStateOf(TextFieldValue(state.expression, TextRange(state.cursor.coerceIn(0, state.expression.length))))
@@ -144,17 +145,13 @@ fun DisplayPanel(
                         .padding(vertical = 8.dp)
                 )
             }
+            // Read-only on purpose: the app is driven by its own keypad, so the
+            // soft keyboard never covers the display. `showKeyboardOnFocus` is
+            // false as well so focusing the field cannot summon the IME either.
             BasicTextField(
                 value = fieldValue,
-                onValueChange = {
-                    fieldValue = it
-                    if (it.text.length < state.expression.length) {
-                        // Deletions from the system keyboard behave like ⌫.
-                        onExpressionChanged(it.text, it.selection.end)
-                    } else {
-                        onExpressionChanged(it.text, it.selection.end)
-                    }
-                },
+                onValueChange = { /* only the keypad edits the expression */ },
+                readOnly = true,
                 textStyle = MaterialTheme.typography.headlineLarge.copy(
                     fontFamily = FontFamily.Monospace,
                     fontSize = 28.sp,
@@ -162,18 +159,24 @@ fun DisplayPanel(
                     color = colors.onSurface
                 ),
                 cursorBrush = SolidColor(colors.primary),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(
-                    onDone = {
-                        keyboard?.hide()
-                        onExpressionChanged(state.expression, state.expression.length)
-                    }
-                ),
+                keyboardOptions = KeyboardOptions(showKeyboardOnFocus = false),
+                onTextLayout = { layout -> textLayout = layout },
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.CenterStart)
                     .horizontalScroll(scroll)
                     .padding(vertical = 8.dp)
+                    .pointerInput(state.expression) {
+                        detectTapGestures { offset ->
+                            // Tapping the text moves the caret to that character.
+                            textLayout?.let { layout ->
+                                val position = layout.getOffsetForPosition(
+                                    Offset(offset.x + scroll.value, offset.y)
+                                )
+                                onCursorChanged(position)
+                            }
+                        }
+                    }
             )
         }
 

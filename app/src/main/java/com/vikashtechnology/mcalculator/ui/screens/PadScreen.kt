@@ -28,6 +28,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.vikashtechnology.mcalculator.ui.CalcKey
 import com.vikashtechnology.mcalculator.ui.CalculatorViewModel
+import com.vikashtechnology.mcalculator.ui.components.AiHeroCard
 import com.vikashtechnology.mcalculator.ui.components.DisplayPanel
 import com.vikashtechnology.mcalculator.ui.components.Keypad
 import com.vikashtechnology.mcalculator.ui.HelpSheet
@@ -39,6 +40,7 @@ import com.vikashtechnology.mcalculator.ui.KeypadPage
 fun PadScreen(
     viewModel: CalculatorViewModel,
     showMessage: (String) -> Unit,
+    onOpenAi: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state = viewModel.ui
@@ -47,6 +49,9 @@ fun PadScreen(
     var showHelp by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.fillMaxSize()) {
+        // Hero section: the AI entry point sits at the very top of the pad.
+        AiHeroCard(onOpenAi = onOpenAi)
+
         DisplayPanel(
             state = state,
             onExpressionChanged = { text, cursor -> viewModel.onExpressionChanged(text, cursor) },

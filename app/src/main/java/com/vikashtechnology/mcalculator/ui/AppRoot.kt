@@ -54,6 +54,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vikashtechnology.mcalculator.ui.components.AiHeroMenuRow
+import com.vikashtechnology.mcalculator.ui.screens.AiScreen
 import com.vikashtechnology.mcalculator.ui.screens.ConverterScreen
 import com.vikashtechnology.mcalculator.ui.screens.GraphScreen
 import com.vikashtechnology.mcalculator.ui.screens.MatrixScreen
@@ -78,6 +80,7 @@ private const val ItemsPerLine = 2
 fun AppRoot(viewModel: CalculatorViewModel) {
     var tab by remember { mutableStateOf(AppTab.CALC) }
     var menuOpen by remember { mutableStateOf(false) }
+    var aiOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val showMessage: (String) -> Unit = { message ->
@@ -85,7 +88,8 @@ fun AppRoot(viewModel: CalculatorViewModel) {
     }
 
     // Back closes the drop-down first, then returns to the calculator.
-    BackHandler(enabled = menuOpen || tab != AppTab.CALC) {
+    // While Ask AI is open its own screen owns the back gesture.
+    BackHandler(enabled = menuOpen || (!aiOpen && tab != AppTab.CALC)) {
         if (menuOpen) menuOpen = false else tab = AppTab.CALC
     }
 
@@ -99,19 +103,34 @@ fun AppRoot(viewModel: CalculatorViewModel) {
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
         ) {
-            TopBar(
-                title = tab.label,
-                onMenuClick = { menuOpen = !menuOpen }
-            )
+            // Ask AI is a full-screen sub-page with its own header, so the app
+            // bar steps aside while it is open.
+            if (!aiOpen) {
+                TopBar(
+                    title = tab.label,
+                    onMenuClick = { menuOpen = !menuOpen }
+                )
+            }
 
             Box(modifier = Modifier.fillMaxSize()) {
-                when (tab) {
-                    AppTab.CALC -> PadScreen(viewModel = viewModel, showMessage = showMessage)
-                    AppTab.GRAPH -> GraphScreen(viewModel = viewModel, showMessage = showMessage)
-                    AppTab.SOLVE -> SolverScreen(viewModel = viewModel)
-                    AppTab.MATRIX -> MatrixScreen(viewModel = viewModel)
-                    AppTab.UNITS -> ConverterScreen(viewModel = viewModel, showMessage = showMessage)
-                    AppTab.STATS -> StatsScreen(viewModel = viewModel)
+                if (aiOpen) {
+                    AiScreen(
+                        onClose = { aiOpen = false },
+                        showMessage = showMessage
+                    )
+                } else {
+                    when (tab) {
+                        AppTab.CALC -> PadScreen(
+                            viewModel = viewModel,
+                            showMessage = showMessage,
+                            onOpenAi = { aiOpen = true }
+                        )
+                        AppTab.GRAPH -> GraphScreen(viewModel = viewModel, showMessage = showMessage)
+                        AppTab.SOLVE -> SolverScreen(viewModel = viewModel)
+                        AppTab.MATRIX -> MatrixScreen(viewModel = viewModel)
+                        AppTab.UNITS -> ConverterScreen(viewModel = viewModel, showMessage = showMessage)
+                        AppTab.STATS -> StatsScreen(viewModel = viewModel)
+                    }
                 }
 
                 SnackbarHost(
@@ -122,7 +141,7 @@ fun AppRoot(viewModel: CalculatorViewModel) {
                 )
 
                 // Dim the tool while the drop-down is open; tapping dismisses it.
-                if (menuOpen) {
+                if (menuOpen && !aiOpen) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -152,6 +171,11 @@ fun AppRoot(viewModel: CalculatorViewModel) {
                     onSelect = { entry ->
                         tab = entry
                         menuOpen = false
+                    },
+                    onOpenAi = {
+                        menuOpen = false
+                        tab = AppTab.CALC
+                        aiOpen = true
                     },
                     onClose = { menuOpen = false }
                 )
@@ -211,6 +235,7 @@ private fun TopBar(
 private fun DropDownMenuPanel(
     selected: AppTab,
     onSelect: (AppTab) -> Unit,
+    onOpenAi: () -> Unit,
     onClose: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -251,6 +276,9 @@ private fun DropDownMenuPanel(
                     )
                 }
             }
+
+            AiHeroMenuRow(onOpenAi = onOpenAi)
+            Spacer(modifier = Modifier.height(8.dp))
 
             AppTab.entries.chunked(ItemsPerLine).forEach { line ->
                 Row(

@@ -76,6 +76,16 @@ fun HelpSheet(onDismiss: () -> Unit) {
                 )
             )
             Section(
+                "Ask AI",
+                listOf(
+                    "Tap the Ask AI card at the top of the pad, or the Ask AI row in the menu.",
+                    "Sign in with a Puter account the first time; 'Continue as guest' makes a temporary one.",
+                    "Upload a photo, a PDF or a text file of a question and press Solve this question.",
+                    "It only solves the question in the file you upload. This screen needs internet;",
+                    "everything else in the app works offline."
+                )
+            )
+            Section(
                 "Units and statistics",
                 listOf(
                     "Convert tab: pick a category, type a value, switch units instantly.",

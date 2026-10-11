@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Ask AI</title>
+<!-- Puter.js provides auth + AI with no API keys. Loaded from the official CDN. -->
+<script src="https://js.puter.com/v2/"></script>
+<style>
+  :root {
+    --bg: #0d0f1a;
+    --card: #191d2e;
+    --card-high: #1f2438;
+    --line: #2b3152;
+    --text: #e7e9f3;
+    --muted: #aeb4cc;
+    --primary: #7c6cff;
+    --primary-ink: #ffffff;
+    --accent: #35c2f0;
+    --danger: #ff6b6b;
+    --ok: #3fd08b;
+    --radius: 18px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f7fc;
+      --card: #ffffff;
+      --card-high: #eef0f8;
+      --line: #d9ddeb;
+      --text: #16182a;
+      --muted: #525872;
+      --primary: #5b4be0;
+      --primary-ink: #ffffff;
+      --accent: #0e86c8;
+      --danger: #d64545;
+      --ok: #1f9d63;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    padding: 12px 12px 28px;
+    min-height: 100vh;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  h2 { font-size: 15px; margin: 0 0 8px; }
+  p { margin: 6px 0; color: var(--muted); }
+  .row { display: flex; align-items: center; gap: 8px; }
+  .row.between { justify-content: space-between; }
+  .grow { flex: 1; min-width: 0; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--card-high); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 4px 10px; font-size: 12px; font-weight: 600;
+  }
+  .chip.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); }
+  #authChip { cursor: pointer; }
+  .chip.warn { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
+  button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 14px;
+    padding: 12px 16px; background: var(--card-high); color: var(--text);
+    cursor: pointer;
+  }
+  button.primary { background: var(--primary); color: var(--primary-ink); width: 100%; }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+  button.small { padding: 8px 12px; font-size: 13px; border-radius: 11px; }
+  button:disabled { opacity: .5; }
+  .drop {
+    border: 1.5px dashed var(--line);
+    border-radius: 14px;
+    padding: 22px 14px;
+    text-align: center;
+    color: var(--muted);
+    background: var(--card-high);
+  }
+  .drop.active { border-color: var(--primary); color: var(--text); }
+  .drop strong { color: var(--text); display: block; margin-bottom: 4px; }
+  .preview { margin-top: 12px; }
+  .preview img {
+    width: 100%; max-height: 260px; object-fit: contain;
+    border-radius: 12px; border: 1px solid var(--line); background: #000;
+  }
+  .filechip {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card-high); border: 1px solid var(--line);
+    border-radius: 12px; padding: 10px 12px;
+  }
+  .filechip .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .filechip .meta { color: var(--muted); font-size: 12px; }
+  .answer {
+    white-space: pre-wrap; word-break: break-word;
+    background: var(--card-high); border: 1px solid var(--line);
+    border-radius: 14px; padding: 12px; margin-top: 10px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 14px;
+  }
+  .answer:empty { display: none; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .error { color: var(--danger); font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
+  .spinner {
+    width: 15px; height: 15px; border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--primary) 35%, transparent);
+    border-top-color: var(--primary);
+    animation: spin .8s linear infinite; display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none !important; }
+  ol.steps { color: var(--muted); font-size: 13px; margin: 6px 0 0 18px; padding: 0; }
+  label.switch { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+  input[type=checkbox] { width: 18px; height: 18px; accent-color: var(--primary); }
+</style>
+</head>
+<body>
+
+<div class="card" id="head">
+  <div class="row between">
+    <div class="grow">
+      <h1>Ask AI</h1>
+      <div class="muted" id="subtitle">Upload a photo or document of a question — get it solved, step by step.</div>
+    </div>
+    <span class="chip" id="authChip" title="Tap to re-check the sign-in">checking…</span>
+  </div>
+</div>
+
+<!-- Sign-in gate -->
+<div class="card" id="gate">
+  <h2>Sign in to continue</h2>
+  <p>
+    The solver runs on your Puter account, which also keeps your usage free.
+    Sign in once and the app remembers you.
+  </p>
+  <button class="primary" id="signInBtn">Sign in with Puter</button>
+  <div class="row" style="margin-top:8px">
+    <button class="ghost small grow" id="guestBtn">Continue as guest</button>
+  </div>
+  <div class="error hidden" id="authError"></div>
+</div>
+
+<!-- Upload + solve -->
+<div class="card hidden" id="solver">
+  <h2>1. Upload the question</h2>
+  <div class="drop" id="drop">
+    <strong>Tap to choose a file</strong>
+    Photo of a problem, PDF worksheet, or a text file
+  </div>
+  <input type="file" id="fileInput" class="hidden"
+         accept="image/*,application/pdf,.txt,.md,.csv,text/plain" />
+
+  <div class="preview hidden" id="preview">
+    <img id="previewImg" alt="Selected question" class="hidden" />
+    <div class="filechip" id="fileChip">
+      <span style="font-size:20px" id="fileIcon">📄</span>
+      <div class="grow">
+        <div class="name" id="fileName">file</div>
+        <div class="meta" id="fileMeta"></div>
+      </div>
+      <button class="ghost small" id="clearBtn">Remove</button>
+    </div>
+  </div>
+
+  <h2 style="margin-top:16px">2. Solve it</h2>
+  <label class="switch" for="stepsToggle">
+    <input type="checkbox" id="stepsToggle" checked />
+    Show the step-by-step working
+  </label>
+  <button class="primary" id="solveBtn" style="margin-top:10px" disabled>Solve this question</button>
+  <div class="row" style="margin-top:8px">
+    <span class="chip" id="statusChip">idle</span>
+    <span class="spinner hidden" id="spinner"></span>
+    <span class="grow"></span>
+    <button class="ghost small hidden" id="stopBtn">Stop</button>
+    <button class="ghost small hidden" id="copyBtn">Copy</button>
+  </div>
+  <div class="error hidden" id="solveError"></div>
+  <div class="answer" id="answer"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var state = {
+    file: null,
+    kind: null,          // "image" | "pdf" | "text"
+    textContent: null,   // extracted text for text/pdf files
+    solving: false,
+    cancelled: false,
+    signedIn: false
+  };
+
+  var el = function (id) { return document.getElementById(id); };
+
+  // ---- bridge to the Android host (status chip, clipboard fallback) --------
+  function notify(payload) {
+    try {
+      if (window.AndroidBridge && window.AndroidBridge.onStatus) {
+        window.AndroidBridge.onStatus(JSON.stringify(payload));
+      }
+    } catch (e) { /* bridge is optional */ }
+  }
+
+  function setStatus(text, kind) {
+    var chip = el("statusChip");
+    chip.textContent = text;
+    chip.className = "chip" + (kind ? " " + kind : "");
+    notify({ event: "status", text: text, kind: kind || "" });
+  }
+
+  function showError(message) {
+    var box = el("solveError");
+    box.textContent = message;
+    box.classList.remove("hidden");
+    notify({ event: "error", text: message });
+  }
+
+  function clearError() {
+    el("solveError").classList.add("hidden");
+    el("solveError").textContent = "";
+  }
+
+  // ---- wait for puter.js to arrive ----------------------------------------
+  function waitForPuter(timeoutMs) {
+    return new Promise(function (resolve, reject) {
+      var started = Date.now();
+      (function poll() {
+        if (window.puter && window.puter.ai) return resolve(window.puter);
+        if (Date.now() - started > timeoutMs) {
+          return reject(new Error(
+            "Could not reach Puter. Check the internet connection and try again."
+          ));
+        }
+        setTimeout(poll, 200);
+      })();
+    });
+  }
+
+  // ---- auth ---------------------------------------------------------------
+  function refreshAuth() {
+    return waitForPuter(20000).then(function () {
+      var signedIn = false;
+      try { signedIn = !!puter.auth.isSignedIn(); } catch (e) { signedIn = false; }
+      state.signedIn = signedIn;
+
+      if (!signedIn) {
+        el("authChip").textContent = "signed out";
+        el("authChip").className = "chip warn";
+        el("gate").classList.remove("hidden");
+        el("solver").classList.add("hidden");
+        notify({ event: "auth", signedIn: false, user: null });
+        return null;
+      }
+
+      return Promise.resolve(puter.auth.getUser())
+        .then(function (user) {
+          var name = (user && (user.username || user.email)) || "Puter user";
+          el("authChip").textContent = name.length > 18 ? name.slice(0, 17) + "…" : name;
+          el("authChip").className = "chip ok";
+          el("gate").classList.add("hidden");
+          el("solver").classList.remove("hidden");
+          notify({ event: "auth", signedIn: true, user: name });
+          return user;
+        })
+        .catch(function () {
+          // Signed in but the profile call failed: still allow solving.
+          el("authChip").textContent = "signed in";
+          el("authChip").className = "chip ok";
+          el("gate").classList.add("hidden");
+          el("solver").classList.remove("hidden");
+          notify({ event: "auth", signedIn: true, user: null });
+        });
+    }).catch(function (error) {
+      el("authChip").textContent = "offline";
+      el("authChip").className = "chip warn";
+      var box = el("authError");
+      box.textContent = error.message || String(error);
+      box.classList.remove("hidden");
+      notify({ event: "error", text: box.textContent });
+    });
+  }
+
+  function signIn(options) {
+    el("authError").classList.add("hidden");
+    el("authChip").textContent = "signing in…";
+    el("authChip").className = "chip";
+    return waitForPuter(20000)
+      .then(function () { return puter.auth.signIn(options); })
+      .then(function () { return refreshAuth(); })
+      .catch(function (error) {
+        var message = (error && (error.msg || error.message)) || String(error);
+        if (error && error.error === "popup_blocked") {
+          message = "The sign-in window was blocked. Please tap Sign in again.";
+        } else if (error && error.error === "auth_window_closed") {
+          message = "Sign-in was cancelled.";
+        } else if (error && error.error === "unsupported_origin") {
+          message = "This page has no origin Puter can sign in — please report this.";
+        }
+        var box = el("authError");
+        box.textContent = message;
+        box.classList.remove("hidden");
+        el("authChip").textContent = "signed out";
+        el("authChip").className = "chip warn";
+        notify({ event: "error", text: message });
+      });
+  }
+
+  // ---- file selection ----------------------------------------------------
+  var IMAGE_TYPES = /^image\//;
+  var TEXT_TYPES = /^text\//;
+  var TEXT_EXT = /\.(txt|md|csv|tsv|json|log)$/i;
+
+  function readAsText(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result || "")); };
+      reader.onerror = function () { reject(new Error("Could not read that file.")); };
+      reader.readAsText(file);
+    });
+  }
+
+  function onFileChosen(file) {
+    clearError();
+    state.file = file;
+    state.textContent = null;
+
+    if (IMAGE_TYPES.test(file.type) || /\.(png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(file.name)) {
+      state.kind = "image";
+    } else if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+      state.kind = "pdf";
+    } else if (TEXT_TYPES.test(file.type) || TEXT_EXT.test(file.name)) {
+      state.kind = "text";
+    } else {
+      state.kind = "unknown";
+    }
+
+    el("preview").classList.remove("hidden");
+    el("fileName").textContent = file.name || "upload";
+    el("fileMeta").textContent = prettySize(file.size) + " · " + state.kind.toUpperCase();
+    el("fileIcon").textContent = state.kind === "image" ? "🖼️" : state.kind === "pdf" ? "📕" : "📄";
+
+    if (state.kind === "image") {
+      var url = URL.createObjectURL(file);
+      el("previewImg").src = url;
+      el("previewImg").classList.remove("hidden");
+    } else {
+      el("previewImg").classList.add("hidden");
+      el("previewImg").removeAttribute("src");
+    }
+
+    if (state.kind === "text") {
+      readAsText(file).then(function (text) {
+        state.textContent = text.slice(0, 20000);
+        setStatus("text ready", "ok");
+      }).catch(function (error) { showError(error.message); });
+    } else if (state.kind === "unknown") {
+      showError("That file type is not supported. Use a photo, a PDF, or a .txt file.");
+    } else {
+      setStatus("ready to solve", "ok");
+    }
+
+    el("solveBtn").disabled = state.kind === "unknown";
+    notify({ event: "file", name: file.name, size: file.size, kind: state.kind });
+  }
+
+  function prettySize(bytes) {
+    if (!bytes && bytes !== 0) return "";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function clearFile() {
+    state.file = null;
+    state.kind = null;
+    state.textContent = null;
+    el("fileInput").value = "";
+    el("preview").classList.add("hidden");
+    el("answer").textContent = "";
+    el("copyBtn").classList.add("hidden");
+    el("solveBtn").disabled = true;
+    clearError();
+    setStatus("idle");
+    notify({ event: "file", name: null, kind: null });
+  }
+
+  // ---- PDF text extraction (loaded only when a PDF is picked) -------------
+  function loadPdfJs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    return new Promise(function (resolve, reject) {
+      var script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+      script.onload = function () {
+        if (!window.pdfjsLib) return reject(new Error("pdf.js failed to load"));
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        resolve(window.pdfjsLib);
+      };
+      script.onerror = function () { reject(new Error("pdf.js failed to load")); };
+      document.head.appendChild(script);
+    });
+  }
+
+  function pdfToText(file) {
+    return loadPdfJs().then(function (pdfjs) {
+      return file.arrayBuffer().then(function (buffer) {
+        return pdfjs.getDocument({ data: buffer }).promise;
+      });
+    }).then(function (doc) {
+      var pagesToRead = Math.min(doc.numPages, 5);
+      var chains = [];
+      for (var page = 1; page <= pagesToRead; page++) {
+        chains.push(doc.getPage(page).then(function (p) {
+          return p.getTextContent().then(function (content) {
+            return content.items.map(function (item) { return item.str; }).join(" ");
+          });
+        }));
+      }
+      return Promise.all(chains).then(function (pages) {
+        return pages.join("\n\n").replace(/\s+\n/g, "\n").trim();
+      });
+    });
+  }
+
+  // ---- response parsing (tolerant across SDK versions) --------------------
+  function textFromResponse(response) {
+    if (response == null) return "";
+    if (typeof response === "string") return response;
+    if (typeof response.text === "string" && !response.message) return response.text;
+    var message = response.message || (response.choices && response.choices[0] && response.choices[0].message);
+    if (!message) return "";
+    var content = message.content;
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) {
+      return content.map(function (part) {
+        if (typeof part === "string") return part;
+        if (part && typeof part.text === "string") return part.text;
+        return "";
+      }).join("");
+    }
+    if (content && typeof content.text === "string") return content.text;
+    return "";
+  }
+
+  function buildPrompt(withSteps) {
+    var lines = [
+      "You are the maths solver inside a calculator app.",
+      "Solve ONLY the question visible in the attached file. Never invent a different question.",
+      "Start by restating the question in one short line.",
+      withSteps
+        ? "Then show the working as numbered steps, keeping each step short."
+        : "Then give a one line explanation.",
+      "Finish with a final line that starts with 'Final answer:'.",
+      "Write plain text maths using ×, ÷, ^, √ and fractions like 3/4 — no LaTeX, no markdown tables.",
+      "If the file has several questions, solve each one in order.",
+      "If the file holds no maths question, reply exactly: I could not find a maths question in this file."
+    ];
+    return lines.join(" ");
+  }
+
+  // ---- solving -----------------------------------------------------------
+  function appendAnswer(text) {
+    if (!text) return;
+    var box = el("answer");
+    box.textContent += text;
+    box.scrollTop = box.scrollHeight;
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+
+  function describeError(error) {
+    var message = (error && (error.msg || error.message)) || String(error);
+    if (/usage|limit|quota|credit/i.test(message)) {
+      return message + "\n\nPuter's free allowance for the day may be used up. Try again later.";
+    }
+    return message;
+  }
+
+  function solve() {
+    if (state.solving || !state.file) return;
+    clearError();
+    el("answer").textContent = "";
+    el("copyBtn").classList.add("hidden");
+    state.solving = true;
+    state.cancelled = false;
+    el("solveBtn").disabled = true;
+    el("spinner").classList.remove("hidden");
+    el("stopBtn").classList.remove("hidden");
+    setStatus("solving…");
+
+    var withSteps = el("stepsToggle").checked;
+    var prompt = buildPrompt(withSteps);
+
+    (function prepare() {
+      if (state.kind === "text") {
+        if (state.textContent) return Promise.resolve(state.textContent);
+        return readAsText(state.file).then(function (text) {
+          state.textContent = text.slice(0, 20000);
+          return state.textContent;
+        });
+      }
+      if (state.kind === "pdf") {
+        setStatus("reading PDF…");
+        return pdfToText(state.file);
+      }
+      return Promise.resolve(null);
+    })()
+      .then(function (text) {
+        if (state.cancelled) return null;
+        var question = prompt;
+        if (text) {
+          question += "\n\nThe uploaded document says:\n---\n" + text.slice(0, 18000) + "\n---";
+        }
+        setStatus(state.kind === "image" ? "reading the photo…" : "solving…");
+
+        var request = state.kind === "image"
+          ? puter.ai.chat(question, state.file, { stream: true })
+          : puter.ai.chat(question, { stream: true });
+
+        return request.then(function (response) {
+          // Streaming responses arrive as an async iterator of chunks.
+          if (response && typeof response[Symbol.asyncIterator] === "function") {
+            var iterator = response[Symbol.asyncIterator]();
+            return (function next() {
+              if (state.cancelled) return Promise.resolve();
+              return iterator.next().then(function (step) {
+                if (step.done) return;
+                var chunk = step.value;
+                if (chunk && chunk.type === "text" && chunk.text) {
+                  if (!state.firstText) {
+                    state.firstText = true;
+                    setStatus("writing the answer…", "ok");
+                  }
+                  appendAnswer(chunk.text);
+                } else if (chunk && chunk.type === "error") {
+                  throw new Error(chunk.error && chunk.error.message ? chunk.error.message : "Puter returned an error.");
+                }
+                return next();
+              });
+            })();
+          }
+          appendAnswer(textFromResponse(response) || "Puter returned an empty answer.");
+        });
+      })
+      .then(function () {
+        if (!state.cancelled) setStatus("done", "ok");
+      })
+      .catch(function (error) {
+        if (state.cancelled) return;
+        showError(
+          state.kind === "pdf"
+            ? "Could not read that PDF — try a screenshot of the question instead.\n\n" + describeError(error)
+            : describeError(error)
+        );
+        setStatus("failed", "warn");
+      })
+      .then(function () {
+        state.solving = false;
+        state.firstText = false;
+        el("spinner").classList.add("hidden");
+        el("stopBtn").classList.add("hidden");
+        el("solveBtn").disabled = !state.file || state.kind === "unknown";
+        if (el("answer").textContent) el("copyBtn").classList.remove("hidden");
+      });
+  }
+
+  function copyAnswer() {
+    var text = el("answer").textContent;
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        setStatus("copied", "ok");
+      }).catch(fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+    function fallbackCopy() {
+      // WebView clipboard access can be blocked; ask the host app to do it.
+      notify({ event: "copy", text: text });
+      setStatus("copied", "ok");
+    }
+  }
+
+  // ---- wiring ------------------------------------------------------------
+  el("signInBtn").addEventListener("click", function () { signIn(); });
+  el("guestBtn").addEventListener("click", function () {
+    signIn({ attempt_temp_user_creation: true });
+  });
+  el("drop").addEventListener("click", function () { el("fileInput").click(); });
+  el("fileInput").addEventListener("change", function (event) {
+    var file = event.target.files && event.target.files[0];
+    if (file) onFileChosen(file);
+  });
+  el("clearBtn").addEventListener("click", clearFile);
+  el("solveBtn").addEventListener("click", solve);
+  el("stopBtn").addEventListener("click", function () {
+    state.cancelled = true;
+    setStatus("stopped");
+  });
+  el("copyBtn").addEventListener("click", copyAnswer);
+  // Handy after finishing a sign-in in the popup window.
+  el("authChip").addEventListener("click", function () { refreshAuth(); });
+
+  window.addEventListener("error", function (event) {
+    if (event && event.message) showError(event.message);
+  });
+  window.addEventListener("unhandledrejection", function (event) {
+    if (event && event.reason) showError(describeError(event.reason));
+  });
+
+  // Let the host app re-check auth after a sign-in popup closes.
+  window.mCalculatorRefreshAuth = refreshAuth;
+  window.mCalculatorHasAnswer = function () { return !!el("answer").textContent; };
+
+  notify({ event: "ready" });
+  refreshAuth();
+})();
+</script>
+</body>
+</html>

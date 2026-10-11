@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- M Calculator is 100% offline: no permissions are required at all. -->
+    <!-- The maths engine is 100% offline and needs no permissions. INTERNET is
+         used only by the optional "Ask AI" screen, which talks to Puter. -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
         android:allowBackup="true"
