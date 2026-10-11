@@ -145,6 +145,10 @@ installs, active users (today / week / range) and calculations and AI questions
 per day, with a per-day table and chart. One D1 database, no other service, and
 the whole setup is one command:
 
+There are two ways to set it up: entirely in the Cloudflare dashboard — see
+[`admin/WEB_SETUP.md`](admin/WEB_SETUP.md), where the Worker even creates its own
+tables — or from a terminal with one command:
+
 ```bash
 cd admin/worker && ./setup.sh        # creates the database, deploys, prints the URL
 ```

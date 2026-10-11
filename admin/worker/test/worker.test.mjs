@@ -7,23 +7,49 @@
  * dashboard HTML replaced by a marker) and then runs this file.
  */
 
-// Minimal D1 stand-in: records inserts and answers the aggregate queries.
+// --- a D1 stand-in that starts *empty* -------------------------------------- //
+// It refuses queries until the Worker has created its tables, which is exactly
+// what a freshly created database in the Cloudflare dashboard does.
 const rows = [];
 const installs = new Set();
+const tables = new Set();
+let ddlRuns = 0;
+
 class Stmt {
   constructor(sql, args) { this.sql = sql; this.args = args || []; }
   bind(...args) { return new Stmt(this.sql, args); }
-  async run() { return { success: true }; }
+  async run() { this.guard(); return { success: true }; }
   async first() {
+    this.guard();
     if (this.sql.includes("COUNT(*) AS total FROM installs")) return { total: installs.size };
     return {};
   }
-  async all() { return { results: [] }; }
+  async all() { this.guard(); return { results: [] }; }
+  guard() {
+    const needs = /events|installs/.test(this.sql) && !/CREATE (TABLE|INDEX)/.test(this.sql);
+    if (!needs) return;
+    for (const table of ["events", "installs"]) {
+      if (this.sql.includes(table) && !tables.has(table)) {
+        throw new Error("no such table: " + table);
+      }
+    }
+  }
 }
+
 const DB = {
   prepare: (sql) => new Stmt(sql),
   batch: async (stmts) => {
+    const ddl = stmts.length > 0 && stmts.every((s) => /^CREATE (TABLE|INDEX)/.test(s.sql));
+    if (ddl) {
+      ddlRuns += 1;
+      for (const s of stmts) {
+        const name = /CREATE TABLE IF NOT EXISTS (\w+)/.exec(s.sql);
+        if (name) tables.add(name[1]);
+      }
+      return stmts.map(() => ({ results: [] }));
+    }
     for (const s of stmts) {
+      s.guard();
       if (s.sql.startsWith("INSERT INTO events")) rows.push(s.args);
       if (s.sql.startsWith("INSERT OR IGNORE INTO installs")) installs.add(s.args[0]);
     }
@@ -40,12 +66,18 @@ function check(name, condition, extra = "") {
   if (!condition) failures += 1;
 }
 
-// health
+// health — on an empty database this is what creates the tables
 let res = await worker.fetch(new Request("https://x.workers.dev/health"), env);
 let body = await res.json();
-check("health ok", res.status === 200 && body.ok === true, JSON.stringify(body));
+check("health ok on an empty database", res.status === 200 && body.ok === true, JSON.stringify(body));
+check("health reports the schema was created", body.schema === "ready", String(body.schema));
+check("tables were created", tables.has("events") && tables.has("installs"), [...tables].join());
 check("health lists secrets", body.secrets && body.secrets.ADMIN_TOKEN === true);
 check("health hides no values", JSON.stringify(body).indexOf("localdev") === -1);
+
+// the tables are only created once per isolate
+res = await worker.fetch(new Request("https://x.workers.dev/health"), env);
+check("schema runs once", ddlRuns === 1, "ddlRuns=" + ddlRuns);
 
 // events
 res = await worker.fetch(new Request("https://x.workers.dev/v1/events", {
@@ -83,6 +115,12 @@ res = await worker.fetch(new Request("https://x.workers.dev/v1/solve", {
   body: JSON.stringify({ attachment: { mimeType: "image/png", data: "AAAA" } }),
 }), env);
 check("solve reports the missing secret", res.status === 503, String(res.status));
+
+// a Worker with no database bound at all must not pretend to be healthy
+const brokenEnv = { ADMIN_TOKEN: "localdev" };
+res = await worker.fetch(new Request("https://x.workers.dev/health"), brokenEnv);
+body = await res.json();
+check("health fails without a binding", res.status === 503 && body.ok === false, JSON.stringify(body).slice(0, 90));
 
 console.log(failures === 0 ? "\nALL CHECKS PASSED" : "\nFAILURES: " + failures);
 process.exit(failures === 0 ? 0 : 1);

@@ -31,6 +31,16 @@ Nothing is sent while the switch in the app's drop-down menu
 (*Anonymous usage stats*) is off, and turning it off also drops whatever was
 still waiting to be uploaded.
 
+## Two ways to set it up
+
+**In a browser, no terminal** — follow [`WEB_SETUP.md`](WEB_SETUP.md). You create
+the Worker and the database in the Cloudflare dashboard, paste `worker.js`, set
+the `ADMIN_TOKEN` secret, and open `…/health`; that page creates the tables, so
+there is no SQL to run by hand. The Worker carries its own schema for exactly
+that reason (`SCHEMA_SQL`, kept in step with `schema.sql` by the test runner).
+
+**From a terminal, one command** — everything below, automated.
+
 ## Set it up — one command
 
 ```bash

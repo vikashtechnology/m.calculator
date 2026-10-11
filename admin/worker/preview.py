@@ -74,11 +74,13 @@ class Handler(BaseHTTPRequestHandler):
                         "ok": True,
                         "service": "AI Calculator stats (preview)",
                         "database": "ok",
+                        "schema": "ready",
                         "secrets": {
                             "ADMIN_TOKEN": True,
                             "GEMINI_API_KEY": False,
                             "GOOGLE_WEB_CLIENT_ID": False,
                         },
+                        "note": "This is the local preview (admin/worker/preview.py) with sample data.",
                     }
                 ),
                 "application/json; charset=utf-8",

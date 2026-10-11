@@ -1,15 +1,55 @@
 #!/usr/bin/env bash
-# Builds the Worker into a testable module and runs the stub-D1 checks.
+# Builds the Worker into a testable module, compares its embedded schema with
+# schema.sql, and runs the stub-D1 checks.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 python3 - << 'PY'
 import pathlib
-worker = pathlib.Path("admin/worker/worker.js").read_text()
+import re
+import sys
+
+worker_path = pathlib.Path("admin/worker/worker.js")
+worker = worker_path.read_text()
+
+# 1. module under test: the Worker with the dashboard HTML replaced by a marker
 start = worker.index("const DASHBOARD_HTML = `") + len("const DASHBOARD_HTML = `")
 end = worker.rindex("`;")
 module = worker[:start - len("const DASHBOARD_HTML = `")] + "const DASHBOARD_HTML = '<html>ok</html>';\n" + worker[end + 2:]
 pathlib.Path("admin/worker/test/module-under-test.mjs").write_text(module)
+
+
+# 2. the schema the Worker creates must match schema.sql, or the two deployments
+#    (wrangler and dashboard) would drift apart.
+def normalise(statements):
+    return [
+        re.sub(r"\s+", " ", s).strip().rstrip(";").lower()
+        for s in statements
+        if s.strip()
+    ]
+
+
+match = re.search(r"const SCHEMA_SQL = \[(.*?)\n\];", worker, re.S)
+if not match:
+    sys.exit("could not find SCHEMA_SQL in admin/worker/worker.js")
+in_code = re.findall(r"`(.*?)`", match.group(1), re.S)
+
+schema_file = pathlib.Path("admin/worker/schema.sql").read_text()
+without_comments = "\n".join(
+    re.sub(r"--.*$", "", line) for line in schema_file.splitlines()
+)
+in_file = without_comments.split(";")
+
+a, b = normalise(in_code), normalise(in_file)
+if a != b:
+    print("SCHEMA MISMATCH between admin/worker/worker.js and admin/worker/schema.sql")
+    for i in range(max(len(a), len(b))):
+        left = a[i] if i < len(a) else "<missing>"
+        right = b[i] if i < len(b) else "<missing>"
+        if left != right:
+            print(f"  #{i + 1}\n    worker.js: {left}\n    schema.sql: {right}")
+    sys.exit(1)
+print(f"schema: worker.js and schema.sql agree ({len(a)} statements)")
 PY
 
 node admin/worker/test/worker.test.mjs

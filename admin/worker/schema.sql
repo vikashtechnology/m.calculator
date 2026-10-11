@@ -1,4 +1,9 @@
 -- Storage for the anonymous usage counters.
+--
+-- You only need this file when you deploy with wrangler. The Worker also
+-- carries the same statements in SCHEMA_SQL and runs them the first time it
+-- touches an empty database, which is what makes the dashboard-only setup work.
+-- Keep the two in step: tools/run_worker_tests.sh compares them.
 -- Run once per database:
 --   npx wrangler d1 execute m_calculator_stats --remote --file=schema.sql
 

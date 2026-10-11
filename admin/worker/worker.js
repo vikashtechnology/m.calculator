@@ -16,6 +16,49 @@ const EVENT_KINDS = ["app_open", "calc", "ai"];
 const MAX_COUNT = 100_000;
 const ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
+/**
+ * The tables this Worker needs. Kept in step with schema.sql (the test runner
+ * compares the two), and created on demand: deploying from the Cloudflare
+ * dashboard does not give you a way to run a whole .sql file, so the Worker
+ * brings its own schema and runs it the first time it touches a fresh database.
+ * Every statement is IF NOT EXISTS, so it is a no-op afterwards.
+ */
+const SCHEMA_SQL = [
+  `CREATE TABLE IF NOT EXISTS events (
+     id      TEXT    NOT NULL,
+     day     TEXT    NOT NULL,
+     kind    TEXT    NOT NULL,
+     count   INTEGER NOT NULL,
+     version TEXT,
+     sdk     INTEGER,
+     ts      INTEGER NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_events_day ON events (day)`,
+  `CREATE INDEX IF NOT EXISTS idx_events_kind_day ON events (kind, day)`,
+  `CREATE TABLE IF NOT EXISTS installs (
+     id        TEXT PRIMARY KEY,
+     first_day TEXT NOT NULL,
+     version   TEXT,
+     sdk       INTEGER
+   )`,
+  `CREATE INDEX IF NOT EXISTS idx_installs_day ON installs (first_day)`,
+];
+
+let schemaPromise = null;
+
+/** Creates the tables once per isolate; later calls reuse the same promise. */
+function ensureSchema(env) {
+  if (!schemaPromise) {
+    schemaPromise = env.DB.batch(SCHEMA_SQL.map((sql) => env.DB.prepare(sql)))
+      .then(() => true)
+      .catch((error) => {
+        schemaPromise = null; // let the next request try again
+        throw error;
+      });
+  }
+  return schemaPromise;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -100,6 +143,7 @@ async function handleEvents(request, env) {
   );
 
   try {
+    await ensureSchema(env);
     await env.DB.batch(statements);
   } catch (error) {
     return json({ error: "database error", detail: String(error) }, 500);
@@ -324,15 +368,19 @@ async function handleSolve(request, env) {
  */
 async function handleHealth(env) {
   let database = "ok";
+  let schema = "ready";
   try {
+    await ensureSchema(env); // a fresh database gets its tables right here
     await env.DB.prepare("SELECT COUNT(*) AS n FROM installs").first();
   } catch (error) {
     database = "error: " + String(error);
+    schema = "could not be created — is the D1 database bound as DB?";
   }
   const body = {
     ok: database === "ok",
     service: "AI Calculator stats",
     database,
+    schema,
     secrets: {
       ADMIN_TOKEN: Boolean(env.ADMIN_TOKEN),
       GEMINI_API_KEY: Boolean(env.GEMINI_API_KEY),
@@ -344,7 +392,9 @@ async function handleHealth(env) {
       events: "POST /v1/events",
       solve: "POST /v1/solve  (optional; the app uses the user's own key)",
     },
-    note: "The dashboard needs ADMIN_TOKEN. /v1/events is what the app posts to.",
+    note:
+      "Opening this page creates the tables if the database is empty. " +
+      "The dashboard needs ADMIN_TOKEN; /v1/events is what the app posts to.",
   };
   return json(body, database === "ok" ? 200 : 503);
 }
@@ -361,6 +411,7 @@ async function handleStats(request, env, url) {
   const weekAgo = new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10);
 
   try {
+    await ensureSchema(env);
     const [totals, series, active, installsByDay, versions] = await env.DB.batch([
       env.DB.prepare(
         "SELECT kind, SUM(count) AS total FROM events WHERE day >= ? GROUP BY kind"
