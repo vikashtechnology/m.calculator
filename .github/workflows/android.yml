@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 jobs:
   build:
@@ -24,19 +25,42 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - name: Set up Android SDK
+        run: |
+          set -e
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          if [ ! -d "$SDK" ]; then SDK=/usr/local/lib/android/sdk; fi
+          echo "Using Android SDK at $SDK"
+          ls "$SDK" || true
+          SDKMANAGER="$(find "$SDK" -name sdkmanager -type f 2>/dev/null | head -n 1 || true)"
+          echo "sdkmanager: $SDKMANAGER"
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --sdk_root="$SDK" --licenses > /dev/null 2>&1 || true
+            "$SDKMANAGER" --sdk_root="$SDK" "platforms;android-34" "build-tools;34.0.0" || true
+          fi
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Unit tests (math engine)
-        run: ./gradlew testDebugUnitTest --stacktrace
+        id: tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          mkdir -p ci-logs
+          ./gradlew testDebugUnitTest --stacktrace --continue 2>&1 | tee ci-logs/unit-tests.log
 
       - name: Build debug and release APKs
-        run: ./gradlew assembleDebug assembleRelease --stacktrace
+        id: apk
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug assembleRelease --stacktrace 2>&1 | tee ci-logs/assemble.log
 
       - name: Upload APKs
+        if: steps.apk.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: m-calculator-apk
@@ -45,10 +69,52 @@ jobs:
             app/build/outputs/apk/release/*.apk
           if-no-files-found: error
 
-      - name: Unit test report
+      - name: Publish test report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-report
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
           if-no-files-found: ignore
+
+      - name: Report failures in an issue
+        if: steps.tests.outcome == 'failure' || steps.apk.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          TITLE="CI failure (${GITHUB_REF_NAME})"
+          {
+            echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Commit: $GITHUB_SHA"
+            echo
+            echo '## Failing tests'
+            echo '```'
+            grep -h -E "<testcase|<failure|<error" app/build/test-results/testDebugUnitTest/*.xml 2>/dev/null | head -c 20000
+            echo '```'
+            echo '## Failure details'
+            echo '```'
+            grep -h -A 12 -E "<failure|<error" app/build/test-results/testDebugUnitTest/*.xml 2>/dev/null | head -c 40000
+            echo '```'
+            echo '## Build log tail'
+            echo '```'
+            tail -c 20000 ci-logs/unit-tests.log 2>/dev/null
+            echo '```'
+            echo '## Assemble log tail'
+            echo '```'
+            tail -c 20000 ci-logs/assemble.log 2>/dev/null
+            echo '```'
+          } > ci-failure.md || true
+          BODY="$(head -c 60000 ci-failure.md)"
+          EXISTING="$(gh issue list --state open --search "CI failure in:title" --json number --jq '.[0].number' 2>/dev/null)"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY" || true
+          else
+            gh issue create --title "$TITLE" --body "$BODY" || true
+          fi
+
+      - name: Fail the job if anything failed
+        if: steps.tests.outcome == 'failure' || steps.apk.outcome == 'failure'
+        run: exit 1
