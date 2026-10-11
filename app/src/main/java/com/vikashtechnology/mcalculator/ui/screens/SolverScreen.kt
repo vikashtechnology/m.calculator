@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -83,26 +82,30 @@ fun SolverScreen(
                     NumberField(
                         value = state.guess,
                         label = "Start at",
-                        onValueChange = { value -> viewModel.updateSolver { it.copy(guess = value) } }
+                        onValueChange = { value -> viewModel.updateSolver { it.copy(guess = value) } },
+                        modifier = Modifier.weight(1f)
                     )
                 }
                 SolverMode.DERIVATIVE -> {
                     NumberField(
                         value = state.point,
                         label = "at x =",
-                        onValueChange = { value -> viewModel.updateSolver { it.copy(point = value) } }
+                        onValueChange = { value -> viewModel.updateSolver { it.copy(point = value) } },
+                        modifier = Modifier.weight(1f)
                     )
                 }
                 SolverMode.INTEGRAL, SolverMode.SUM, SolverMode.PRODUCT -> {
                     NumberField(
                         value = state.lower,
                         label = "from",
-                        onValueChange = { value -> viewModel.updateSolver { it.copy(lower = value) } }
+                        onValueChange = { value -> viewModel.updateSolver { it.copy(lower = value) } },
+                        modifier = Modifier.weight(1f)
                     )
                     NumberField(
                         value = state.upper,
                         label = "to",
-                        onValueChange = { value -> viewModel.updateSolver { it.copy(upper = value) } }
+                        onValueChange = { value -> viewModel.updateSolver { it.copy(upper = value) } },
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -178,7 +181,8 @@ fun SolverScreen(
 private fun NumberField(
     value: String,
     label: String,
-    onValueChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     OutlinedTextField(
         value = value,
@@ -187,7 +191,7 @@ private fun NumberField(
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         textStyle = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
-        modifier = Modifier.width(130.dp)
+        modifier = modifier
     )
 }
 
