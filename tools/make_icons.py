@@ -1,453 +1,392 @@
-"""Generates the Ai Calculator launcher icons from the artwork in assets/app-icon.svg.
+#!/usr/bin/env python3
+"""Draws the AI Calculator launcher icon and writes every Android variant.
 
-Run from the repository root:
+    python3 tools/make_icons.py                     # the shipping style: "card"
+    python3 tools/make_icons.py --style outline     # card | outline | glyph
+    python3 tools/make_icons.py --concepts          # side-by-side sheet of all three
 
-    python3 tools/make_icons.py            # Pillow only, no other requirements
+Pillow only — the build environment has no SVG rasteriser, so the icon is drawn
+as plain geometry instead of being traced from artwork. Everything is defined in
+a 512-unit design space and rendered with 4× supersampling, so the same shapes
+come out crisp from 48 px up to 512 px.
 
-The SVG is the design source; this script draws the same artwork with Pillow
-(no SVG renderer is available in CI, and Pillow is all that is needed) and writes:
+Outputs, per density (mdpi 48 · hdpi 72 · xhdpi 96 · xxhdpi 144 · xxxhdpi 192):
 
-    app/src/main/res/mipmap-*/ic_launcher.png                 legacy square
-    app/src/main/res/mipmap-*/ic_launcher_round.png           legacy round
-    app/src/main/res/mipmap-*/ic_launcher_background.png      adaptive, full bleed
-    app/src/main/res/mipmap-*/ic_launcher_foreground.png      adaptive, safe zone
-    app/src/main/res/mipmap-*/ic_launcher_monochrome.png      adaptive, themed
-    assets/play-store-icon-512.png                            Play Store listing
+    ic_launcher.png              square icon with rounded corners (pre-Android 8)
+    ic_launcher_round.png        circular icon (pre-Android 8)
+    ic_launcher_background.png   adaptive background layer (108dp canvas)
+    ic_launcher_foreground.png   adaptive foreground layer (108dp canvas)
+    ic_launcher_monochrome.png   themed-icon glyph (Android 13+)
 
-Both the adaptive layers and the legacy icons come from one drawing routine, so
-they can never drift apart. Re-run this after changing the design.
+plus assets/play-store-icon-512.png and assets/app-icon-preview.png.
 """
+from __future__ import annotations
 
-import os
-import math
+import argparse
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RES = os.path.join(ROOT, "app", "src", "main", "res")
-ASSETS = os.path.join(ROOT, "assets")
+ROOT = Path(__file__).resolve().parent.parent
+ASSETS = ROOT / "assets"
 
-SERIF = "/usr/share/fonts/truetype/dejavu/DejaVuSerif.ttf"
-SERIF_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"
-SANS = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-SANS_BOLD = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+DENSITIES = {"mdpi": 48, "hdpi": 72, "xhdpi": 96, "xxhdpi": 144, "xxxhdpi": 192}
+SS = 4                     # supersampling factor
+D = 512.0                  # design space
+TILE_RADIUS = 0.235        # corner radius of a launcher tile, × side
+VISIBLE = 2 / 3            # part of the 108dp canvas a launcher keeps visible
+STYLES = ("card", "outline", "glyph")
 
-DENSITIES = {"mdpi": 1.0, "hdpi": 1.5, "xhdpi": 2.0, "xxhdpi": 3.0, "xxxhdpi": 4.0}
+# --- the palette ----------------------------------------------------------- #
+TOP = (128, 94, 255)       # violet, top-left of the gradient
+MID = (98, 63, 220)
+BOTTOM = (66, 32, 178)     # deep violet, bottom-right
+GLOW = (168, 141, 255)     # soft highlight in the top-left corner
+INK = (255, 255, 255)      # the calculator itself
+SCREEN = (70, 39, 189)     # display glass (card style)
+KEY = (223, 217, 250)      # light lavender keys
+ACCENT = (99, 63, 240)     # the highlighted "=" key
+SHADOW = (24, 8, 76)       # drop shadow under the calculator
 
-# ---- palette, straight from the SVG ------------------------------------------
-BASE_STOPS = [(0.0, (0x31, 0x2E, 0x81)), (0.40, (0x1E, 0x1B, 0x4B)), (1.0, (0x0F, 0x17, 0x2A))]
-BTN_STOPS = [(0.0, (0x33, 0x41, 0x55)), (1.0, (0x1E, 0x29, 0x3B))]
-OP_STOPS = [(0.0, (0x8B, 0x5C, 0xF6)), (1.0, (0x6D, 0x28, 0xD9))]
-SCREEN_STOPS = [(0.0, (0x02, 0x06, 0x17)), (1.0, (0x0F, 0x17, 0x2A))]
-
-CYAN = (0x22, 0xD3, 0xEE)
-VIOLET = (0x8B, 0x5C, 0xF6)
-MAGENTA = (0xD9, 0x46, 0xEF)
-WHITE = (0xFF, 0xFF, 0xFF)
-BODY_FILL = (0x0F, 0x17, 0x2A)
-LINE = (0x1E, 0x29, 0x3B)
-BTN_LINE = (0x47, 0x55, 0x69)
-OP_LINE = (0x7C, 0x3A, 0xED)
-SCREEN_EDGE = (0x1E, 0x29, 0x3B)
-
-# Geometry in the SVG's 512×512 space.
-BASE = (32, 32, 480, 480, 105)
-BODY = (64, 64, 448, 448, 60)
-SCREEN = (80, 80, 432, 220, 30)
-GRID = 24
-BTN_W, BTN_H, BTN_R = 70, 50, 15
-BTN_X = (80, 162, 244, 326)
-BTN_Y = (240, 300, 360, 420)
-# (column, row) -> symbol; the right-hand column is the operator column.
-KEYS = [
-    (0, 0, "π", False), (1, 0, "e", False), (2, 0, "∫", False), (3, 0, "÷", True),
-    (0, 1, "∑", False), (1, 1, "√", False), (2, 1, "Ai", False), (3, 1, "×", True),
-    (0, 2, "Δ", False), (1, 2, "∂", False), (2, 2, "∇", False), (3, 2, "−", True),
-    (0, 3, "±", False), (1, 3, "≈", False), (2, 3, "=", False), (3, 3, "+", True),
-]
-
-SS = 4  # supersampling factor
-# Render scale: the SVG's 512-unit space -> pixels for the icon being drawn.
-# Set by design() before any geometry is used, so every size shares one drawing
-# routine without shrinking badly.
-_SCALE = float(SS)
+# --- the calculator, in design units --------------------------------------- #
+BODY = (156.0, 126.0, 356.0, 382.0)
+BODY_RADIUS = 38.0
+BODY_STROKE = 16.0         # outline style
+SCREEN_RECT = (180.0, 150.0, 332.0, 198.0)
+SCREEN_RADIUS = 15.0
+KEY_MARGIN = 25.0
+KEY_GAP = 15.0
+KEY_COLUMNS = 3
+KEY_ROWS = 3
+KEY_RADIUS = 12.0
+ACCENT_KEY = (KEY_ROWS - 1, KEY_COLUMNS - 1)   # the "=" key, bottom-right
 
 
-def px(value):
-    """512-space -> render-space (rounded, so it can be used for sizes)."""
-    return int(round(value * _SCALE))
+# --------------------------------------------------------------------------- #
+# small helpers
+# --------------------------------------------------------------------------- #
+def font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
+    name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
+    for folder in ("/usr/share/fonts/truetype/dejavu", "/usr/share/fonts/dejavu"):
+        path = Path(folder) / name
+        if path.exists():
+            return ImageFont.truetype(str(path), size)
+    return ImageFont.load_default()
 
 
-def box(values, pad=0):
-    """(x0, y0, x1, y1, r) -> ((x0, y0, x1, y1), r) in render space."""
-    x0, y0, x1, y1 = values[:4]
-    radius = values[4] if len(values) > 4 else 0
-    return (px(x0 - pad), px(y0 - pad), px(x1 + pad), px(y1 + pad)), px(radius)
+def blank(size: int, value: int = 0) -> Image.Image:
+    return Image.new("L", (size, size), value)
 
 
-def gradient(size, stops, angle=90):
-    """A linear gradient image: 90 = top→bottom, 135 = corner→corner."""
-    span = max(2, int(size * 1.5))
-    strip = Image.new("RGB", (1, span))
-    for y in range(span):
-        t = y / (span - 1)
-        colour = stop_colour(stops, t)
-        strip.putpixel((0, y), colour)
-    strip = strip.resize((span, span), Image.BILINEAR)
-    if angle == 90:
-        image = strip.resize((size, size), Image.BILINEAR)
-    else:
-        rotated = strip.rotate(angle - 90, resample=Image.BILINEAR, expand=True)
-        left = (rotated.width - size) // 2
-        top = (rotated.height - size) // 2
-        image = rotated.crop((left, top, left + size, top + size))
-    return image
+def scaled(rect, scale: float):
+    return tuple(v * scale for v in rect)
 
 
-def stop_colour(stops, t):
-    previous = stops[0]
-    for current in stops:
-        if t <= current[0]:
-            span = current[0] - previous[0]
-            local = 0.0 if span == 0 else (t - previous[0]) / span
-            return tuple(
-                int(previous[1][i] + (current[1][i] - previous[1][i]) * local) for i in range(3)
-            )
-        previous = current
-    return stops[-1][1]
+def key_rects():
+    """(row, column, rect) for every key, laid out inside the calculator body."""
+    left = BODY[0] + KEY_MARGIN
+    right = BODY[2] - KEY_MARGIN
+    top = SCREEN_RECT[3] + 20.0
+    bottom = BODY[3] - KEY_MARGIN
+    width = (right - left - KEY_GAP * (KEY_COLUMNS - 1)) / KEY_COLUMNS
+    height = (bottom - top - KEY_GAP * (KEY_ROWS - 1)) / KEY_ROWS
+    rects = []
+    for row in range(KEY_ROWS):
+        for col in range(KEY_COLUMNS):
+            x = left + col * (width + KEY_GAP)
+            y = top + row * (height + KEY_GAP)
+            rects.append((row, col, (x, y, x + width, y + height)))
+    return rects
 
 
-def rounded_mask(size, values, pad=0):
-    mask = Image.new("L", (size, size), 0)
-    draw = ImageDraw.Draw(mask)
-    rect, radius = box(values, pad=pad)
-    draw.rounded_rectangle(rect, radius=radius, fill=255)
-    return mask
+# --------------------------------------------------------------------------- #
+# the calculator
+# --------------------------------------------------------------------------- #
+def glyph_masks(size: int, style: str):
+    """Masks for the shell, the display and every key."""
+    scale = size / D
 
+    shell = blank(size)
+    pen = ImageDraw.Draw(shell)
+    if style == "outline":
+        pen.rounded_rectangle(
+            scaled(BODY, scale), radius=BODY_RADIUS * scale, outline=255,
+            width=max(1, round(BODY_STROKE * scale)),
+        )
+    elif style == "card":
+        pen.rounded_rectangle(scaled(BODY, scale), radius=BODY_RADIUS * scale, fill=255)
 
-def paint(base, mask, fill):
-    """Composites a solid colour or an image inside a mask."""
-    layer = fill if isinstance(fill, Image.Image) else Image.new("RGB", base.size, fill)
-    base.paste(layer, (0, 0), mask)
-
-
-def soft_shadow(canvas, mask, offset_y, blur, opacity):
-    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    shifted = Image.new("L", canvas.size, 0)
-    shifted.paste(mask, (0, int(offset_y)))
-    shadow.paste((0, 0, 0, int(255 * opacity)), (0, 0), shifted.filter(ImageFilter.GaussianBlur(blur)))
-    return Image.alpha_composite(canvas, shadow)
-
-
-def glow(mask, colour, blur, opacity):
-    layer = Image.new("RGBA", mask.size, (0, 0, 0, 0))
-    tinted = Image.new("RGBA", mask.size, colour + (0,))
-    tinted.putalpha(mask.filter(ImageFilter.GaussianBlur(blur)).point(lambda a: int(a * opacity)))
-    layer = Image.alpha_composite(layer, tinted)
-    return layer
-
-
-def symbol_font(size, bold=False, family="serif"):
-    if family == "sans":
-        return ImageFont.truetype(SANS_BOLD if bold else SANS, size)
-    return ImageFont.truetype(SERIF_BOLD if bold else SERIF, size)
-
-
-def draw_equation(draw, canvas):
-    """∫₀ e^-x² dx = √π, drawn piece by piece so the colours match the SVG."""
-    parts = [
-        ("∫", 42, 0, CYAN, "serif"),
-        ("0", 22, 14, WHITE, "serif"),        # subscript
-        (" e", 42, 0, WHITE, "serif"),
-        ("-x²", 24, -16, WHITE, "serif"),     # superscript
-        (" dx = ", 42, 0, WHITE, "serif"),
-        ("√π", 42, 0, (0xA8, 0x55, 0xF7), "sans"),
-    ]
-    fonts = {}
-    widths = []
-    baseline_y = px(155)
-    for text, size, dy, _colour, family in parts:
-        key = (size, family)
-        if key not in fonts:
-            fonts[key] = symbol_font(px(size), family=family)
-        left, top, right, bottom = draw.textbbox((0, 0), text, font=fonts[key])
-        widths.append((text, fonts[key], right - left, dy, left))
-    total = sum(width for _t, _f, width, _dy, _left in widths)
-    cursor = px(256) - total / 2
-    for text, font, width, dy, left in widths:
-        colour = next(p[3] for p in parts if p[0] == text)
-        draw.text((cursor - left, baseline_y + px(dy)), text, font=font, fill=colour)
-        cursor += width
-
-
-def draw_key(canvas, column, row, label, operator):
-    x = BTN_X[column]
-    y = BTN_Y[row]
-    geometry = (x, y, x + BTN_W, y + BTN_H, BTN_R)
-    mask = rounded_mask(canvas.width, geometry)
-
-    if operator:
-        canvas.alpha_composite(glow(mask, OP_STOPS[0][1], px(4), 0.55))
-
-    # Body: vertical gradient, then the top-half highlight from the SVG.
-    paint(canvas, mask, gradient(canvas.width, OP_STOPS if operator else BTN_STOPS, angle=90))
-    highlight = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    upper = (x, y, x + BTN_W, y + BTN_H / 2, BTN_R)
-    top_mask = rounded_mask(canvas.width, upper)
-    strip = gradient(canvas.width, [(0.0, (0xFF, 0xFF, 0xFF)), (1.0, (0xFF, 0xFF, 0xFF))], 90)
-    faded = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    faded.paste(strip, (0, 0))
-    faded.putalpha(top_mask.point(lambda a: int(a * 0.20)))
-    highlight = Image.alpha_composite(highlight, faded)
-    canvas.alpha_composite(highlight)
-
-    draw = ImageDraw.Draw(canvas)
-    rect, radius = box(geometry)
-    draw.rounded_rectangle(
-        rect,
-        radius=radius,
-        outline=OP_LINE if operator else BTN_LINE,
-        width=max(1, int(SS)),
-    )
-    font = symbol_font(px(26), bold=label == "=")
-    draw.text(
-        (px(x + BTN_W / 2), px(y + BTN_H / 2)),
-        label,
-        font=font,
-        fill=WHITE,
-        anchor="mm",
+    screen = blank(size)
+    ImageDraw.Draw(screen).rounded_rectangle(
+        scaled(SCREEN_RECT, scale), radius=SCREEN_RADIUS * scale, fill=255
     )
 
+    keys = []
+    for row, col, rect in key_rects():
+        mask = blank(size)
+        ImageDraw.Draw(mask).rounded_rectangle(
+            scaled(rect, scale), radius=KEY_RADIUS * scale, fill=255
+        )
+        keys.append((row, col, mask))
 
-def draw_particles(canvas):
-    draw = ImageDraw.Draw(canvas)
-    sparkle = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    sparkle_draw = ImageDraw.Draw(sparkle)
-    dots = [
-        (430, 110, 3, CYAN, 1.0),
-        (445, 125, 2, (0xA8, 0x55, 0xF7), 1.0),
-        (420, 135, 4, WHITE, 0.9),
-        (440, 150, 2, MAGENTA, 1.0),
-        (130, 110, 3, CYAN, 0.8),
-        (380, 120, 4, (0xA8, 0x55, 0xF7), 0.9),
-        (150, 190, 2, MAGENTA, 0.7),
-        (360, 180, 3, WHITE, 0.8),
-    ]
-    for cx, cy, r, colour, opacity in dots:
-        alpha = int(255 * opacity)
-        octagon = [
-            (px(cx + r * math.cos(a * math.pi / 4)), px(cy + r * math.sin(a * math.pi / 4)))
-            for a in range(8)
-        ]
-        sparkle_draw.polygon(octagon, fill=colour + (alpha,))
-    sparkle_draw.polygon(
-        [
-            (px(455), px(95)), (px(460), px(110)), (px(475), px(115)), (px(460), px(120)),
-            (px(455), px(135)), (px(450), px(120)), (px(435), px(115)), (px(450), px(110)),
-        ],
-        fill=CYAN + (204,),
-    )
-    canvas.alpha_composite(glow(sparkle.getchannel("A"), CYAN, px(2.5), 0.7))
-    canvas.alpha_composite(sparkle)
+    if style == "card":
+        # the white shell is the body with the display and the keys punched out
+        for _, _, mask in keys:
+            shell.paste(0, (0, 0), mask)
+        shell.paste(0, (0, 0), screen)
+    return shell, screen, keys
 
 
-def draw_screen(canvas):
-    """The readout: gradient, inner shadow, grid, reflection and the equation."""
-    screen_mask = rounded_mask(canvas.width, SCREEN)
-    paint(canvas, screen_mask, gradient(canvas.width, SCREEN_STOPS, angle=90))
+def render_glyph(px: int, style: str) -> Image.Image:
+    """The calculator alone on a transparent background, shadow included."""
+    big = px
+    shell, screen, keys = glyph_masks(big, style)
+    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
 
-    # Grid lines, clipped to the screen.
-    grid = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    grid_draw = ImageDraw.Draw(grid)
-    start_x, start_y = px(SCREEN[0]), px(SCREEN[1])
-    end_x, end_y = px(SCREEN[2]), px(SCREEN[3])
-    step = px(GRID)
-    x = start_x
-    while x <= end_x:
-        grid_draw.line([(x, start_y), (x, end_y)], fill=LINE + (255,), width=1)
-        x += step
-    y = start_y
-    while y <= end_y:
-        grid_draw.line([(start_x, y), (end_x, y)], fill=LINE + (255,), width=1)
-        y += step
-    grid.putalpha(grid.getchannel("A").point(lambda a: min(a, 102)))
-    canvas.paste(Image.alpha_composite(canvas, grid), (0, 0), screen_mask)
+    silhouette = shell.copy()
+    silhouette.paste(255, (0, 0), screen)
+    for _, _, mask in keys:
+        silhouette.paste(255, (0, 0), mask)
+    shadow = silhouette.filter(ImageFilter.GaussianBlur(big * 0.03))
+    shadow = shadow.point(lambda v: int(v * 0.5))
+    img.paste((*SHADOW, 255), (0, int(big * 0.013)), shadow)
 
-    # Top-half reflection, like the SVG's screenReflect.
-    reflection = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    reflection.paste(gradient(canvas.width, [(0.0, WHITE), (1.0, WHITE)], 90), (0, 0))
-    upper = (SCREEN[0], SCREEN[1], SCREEN[2], SCREEN[1] + (SCREEN[3] - SCREEN[1]) / 2, SCREEN[4])
-    reflection.putalpha(rounded_mask(canvas.width, upper).point(lambda a: int(a * 0.10)))
-    canvas.alpha_composite(reflection)
+    img.paste((*INK, 255), (0, 0), shell)
+    img.paste((*INK, 255), (0, 0), screen)
+    for row, col, mask in keys:
+        img.paste((*INK, 255), (0, 0), mask)
 
-    # Inner shadow along the top edge.
-    ring = Image.new("L", canvas.size, 0)
-    ring_draw = ImageDraw.Draw(ring)
-    rect, radius = box(SCREEN)
-    ring_draw.rounded_rectangle(rect, radius=radius, fill=255)
-    inner = Image.new("L", canvas.size, 0)
-    inner_draw = ImageDraw.Draw(inner)
-    inset, inset_radius = box(SCREEN, pad=-4)
-    inner_draw.rounded_rectangle(inset, radius=inset_radius, fill=255)
-    ring = Image.composite(Image.new("L", canvas.size, 0), ring, inner)
-    dark = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    dark.putalpha(ring.filter(ImageFilter.GaussianBlur(px(3))).point(lambda a: int(a * 0.85)))
-    canvas.alpha_composite(dark)
-
-    # Equation, glowing then crisp.
-    equation = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    draw_equation(ImageDraw.Draw(equation), canvas)
-    canvas.alpha_composite(glow(equation.getchannel("A"), CYAN, px(6), 0.85))
-    canvas.alpha_composite(equation)
-
-    draw = ImageDraw.Draw(canvas)
-    rect, radius = box(SCREEN)
-    draw.rounded_rectangle(rect, radius=radius, outline=SCREEN_EDGE, width=max(1, int(SS)))
+    if style == "card":
+        img.paste((*SCREEN, 255), (0, 0), screen)
+        for row, col, mask in keys:
+            colour = ACCENT if (row, col) == ACCENT_KEY else KEY
+            img.paste((*colour, 255), (0, 0), mask)
+    elif style == "outline":
+        # the display stays white, the "=" key reads solid so there is one focus
+        for row, col, mask in keys:
+            if (row, col) == ACCENT_KEY:
+                continue
+            img.paste((*SCREEN, 255), (0, 0), mask)
+    return img
 
 
-def draw_art(canvas, with_body=True):
-    """The calculator itself: body, screen, keys and particles."""
-    if with_body:
-        body_mask = rounded_mask(canvas.width, BODY)
-        paint(canvas, body_mask, BODY_FILL)
-        draw = ImageDraw.Draw(canvas)
-        rect, radius = box(BODY)
-        draw.rounded_rectangle(rect, radius=radius, outline=LINE, width=max(1, int(SS)))
-    draw_screen(canvas)
-    for column, row, label, operator in KEYS:
-        draw_key(canvas, column, row, label, operator)
-    draw_particles(canvas)
+def glyph(size: int, style: str) -> Image.Image:
+    return render_glyph(size * SS, style).resize((size, size), Image.LANCZOS)
 
 
-def render_base(canvas):
-    """The gradient tile behind everything, plus its glass highlight."""
-    base_mask = rounded_mask(canvas.width, BASE)
-    paint(canvas, base_mask, gradient(canvas.width, BASE_STOPS, angle=135))
-
-    # Glass sheen: a soft diagonal highlight in the top-left, like the SVG path.
-    sheen = Image.new("L", canvas.size, 0)
-    sheen_draw = ImageDraw.Draw(sheen)
-    sheen_draw.polygon(
-        [
-            (px(32), px(137)), (px(137), px(32)), (px(375), px(32)),
-            (px(256), px(100)), (px(137), px(261)), (px(80), px(330)), (px(32), px(385)),
-        ],
-        fill=255,
-    )
-    sheen = Image.composite(
-        sheen.filter(ImageFilter.GaussianBlur(px(6))),
-        Image.new("L", canvas.size, 0),
-        base_mask,
-    )
-    veil = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    veil.putalpha(sheen.point(lambda a: int(a * 0.08)))
-    canvas.alpha_composite(veil)
-
-    draw = ImageDraw.Draw(canvas)
-    rect, radius = box(BASE)
-    draw.rounded_rectangle(rect, radius=radius, outline=WHITE + (38,), width=max(1, int(SS)))
-    inner_rect, inner_radius = box(BASE, pad=-2)
-    draw.rounded_rectangle(
-        inner_rect, radius=inner_radius, outline=(0, 0, 0, 76), width=max(1, int(SS))
-    )
+def gradient(size: int) -> Image.Image:
+    """The tile background: a soft violet diagonal gradient with a corner glow."""
+    small = Image.new("RGB", (8, 8))
+    for y in range(8):
+        for x in range(8):
+            t = (x + y) / 14.0
+            if t < 0.5:
+                a, b, f = TOP, MID, t * 2
+            else:
+                a, b, f = MID, BOTTOM, (t - 0.5) * 2
+            small.putpixel((x, y), tuple(int(a[i] + (b[i] - a[i]) * f) for i in range(3)))
+    img = small.resize((size, size), Image.BICUBIC)
+    glow = blank(size)
+    ImageDraw.Draw(glow).ellipse((-size * 0.4, -size * 0.6, size * 0.8, size * 0.5), fill=88)
+    glow = glow.filter(ImageFilter.GaussianBlur(size * 0.12))
+    return Image.composite(Image.new("RGB", (size, size), GLOW), img, glow)
 
 
-def design(size, rounded=True, shadow=True, with_base=True, art_scale=1.0, monochrome=False):
-    """Draws the whole icon at [size]×[size] and returns it as RGBA."""
-    global _SCALE
-    _SCALE = SS * size / 512.0
-    canvas = Image.new("RGBA", (px(512), px(512)), (0, 0, 0, 0))
-
-    if with_base and rounded:
-        if shadow:
-            canvas = soft_shadow(canvas, rounded_mask(canvas.width, BASE), px(12), px(20), 0.6)
-        render_base(canvas)
-    elif with_base:
-        paint(canvas, Image.new("L", canvas.size, 255), gradient(canvas.width, BASE_STOPS, 135))
-
-    if monochrome:
-        draw_monochrome(canvas, art_scale)
-    elif art_scale == 1.0:
-        draw_art(canvas, with_body=True)
-    else:
-        art = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-        draw_art(art, with_body=True)
-        target = int(canvas.width * art_scale)
-        art = art.resize((target, target), Image.LANCZOS)
-        offset = (canvas.width - target) // 2
-        canvas.alpha_composite(art, (offset, offset))
-
+def tile(size: int, style: str) -> Image.Image:
+    """A full launcher tile: gradient background plus the calculator."""
+    big = size * SS
+    canvas = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    mask = blank(big)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, big - 1, big - 1),
+                                           radius=int(big * TILE_RADIUS), fill=255)
+    canvas.paste(gradient(big), (0, 0), mask)
+    canvas.alpha_composite(render_glyph(big, style))
     return canvas.resize((size, size), Image.LANCZOS)
 
 
-def draw_monochrome(canvas, art_scale=1.0):
-    """A one-colour silhouette for Android 13+ themed icons (tinted by the OS)."""
-    art = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    body_mask = rounded_mask(art.width, BODY)
-    art.paste(WHITE + (46,), (0, 0), body_mask)
-    screen_mask = rounded_mask(art.width, SCREEN)
-    art.paste(WHITE + (64,), (0, 0), screen_mask)
-    draw = ImageDraw.Draw(art)
-    for column, row, _label, _operator in KEYS:
-        x = BTN_X[column]
-        y = BTN_Y[row]
-        mask = rounded_mask(art.width, (x, y, x + BTN_W, y + BTN_H, BTN_R))
-        art.paste(WHITE + (110,), (0, 0), mask)
-    draw_equation(draw, canvas)
-    equation = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    draw_equation(ImageDraw.Draw(equation), canvas)
-    white_equation = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    white_equation.paste(WHITE + (255,), (0, 0), equation.getchannel("A"))
-    art.alpha_composite(white_equation)
-
-    if art_scale == 1.0:
-        canvas.alpha_composite(art)
-    else:
-        target = int(canvas.width * art_scale)
-        resized = art.resize((target, target), Image.LANCZOS)
-        offset = (canvas.width - target) // 2
-        canvas.alpha_composite(resized, (offset, offset))
+def round_tile(size: int, style: str) -> Image.Image:
+    img = tile(size, style)
+    mask = blank(size)
+    ImageDraw.Draw(mask).ellipse((0, 0, size - 1, size - 1), fill=255)
+    img.putalpha(mask)
+    return img
 
 
-def write(image, path):
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    image.save(path, "PNG", optimize=True)
-    return os.path.getsize(path)
+def adaptive_background(size: int) -> Image.Image:
+    """Fills the whole 108dp canvas; the launcher masks it to its own shape."""
+    return gradient(size * 2).resize((size, size), Image.LANCZOS).convert("RGBA")
 
 
-def main():
-    written = 0
+def adaptive_foreground(size: int, style: str) -> Image.Image:
+    """The calculator alone, sized to survive circular and squircle masks."""
+    big = size * SS
+    art = int(round(big * VISIBLE))
+    layer = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    layer.alpha_composite(render_glyph(art, style), ((big - art) // 2, (big - art) // 2))
+    return layer.resize((size, size), Image.LANCZOS)
 
-    # Legacy launcher icons, one per density.
-    for density, scale in DENSITIES.items():
-        size = int(48 * scale)
-        folder = os.path.join(RES, "mipmap-" + density)
-        square = design(size, rounded=True, shadow=True)
-        written += write(square, os.path.join(folder, "ic_launcher.png"))
 
-        circle = square.copy()
-        round_mask = Image.new("L", (size, size), 0)
-        ImageDraw.Draw(round_mask).ellipse([0, 0, size - 1, size - 1], fill=255)
-        circle.putalpha(round_mask)
-        written += write(circle, os.path.join(folder, "ic_launcher_round.png"))
+def monochrome(size: int) -> Image.Image:
+    """One flat colour; Android tints it with the wallpaper palette."""
+    shell, screen, keys = glyph_masks(size, "outline")
+    mask = shell.copy()
+    mask.paste(255, (0, 0), screen)
+    for row, col, key in keys:
+        mask.paste(255, (0, 0), key)
+    out = Image.new("RGBA", (size, size), (255, 255, 255, 0))
+    out.putalpha(mask)
+    return out
 
-        # Adaptive layers: 108dp canvas, art kept inside the safe zone.
-        layer = int(108 * scale)
-        background = design(layer, with_base=True, rounded=False, shadow=False)
-        written += write(background, os.path.join(folder, "ic_launcher_background.png"))
 
-        foreground = design(layer, with_base=False, art_scale=0.85)
-        written += write(foreground, os.path.join(folder, "ic_launcher_foreground.png"))
+def write(img: Image.Image, path: Path) -> int:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(path, "PNG", optimize=True)
+    return path.stat().st_size
 
-        monochrome = design(layer, with_base=False, art_scale=0.85, monochrome=True)
-        written += write(monochrome, os.path.join(folder, "ic_launcher_monochrome.png"))
 
-    # Play Store listing: full-bleed square, no rounding, no shadow.
-    store = design(512, with_base=True, rounded=False, shadow=False)
-    written += write(store, os.path.join(ASSETS, "play-store-icon-512.png"))
+# --------------------------------------------------------------------------- #
+# preview sheets
+# --------------------------------------------------------------------------- #
+def phone_mock(style: str, size=(340, 700)) -> Image.Image:
+    width, height = size
+    phone = Image.new("RGBA", size, (0, 0, 0, 0))
+    backdrop = Image.new("RGB", size)
+    for y in range(height):
+        t = y / height
+        backdrop.paste((int(28 + 24 * t), int(21 + 19 * t), int(60 + 36 * t)), (0, y, width, y + 1))
+    mask = Image.new("L", size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, width - 1, height - 1),
+                                           radius=int(width * 0.13), fill=255)
+    phone.paste(backdrop, (0, 0), mask)
 
-    print("icons written:", written, "bytes across", len(DENSITIES), "densities")
+    draw = ImageDraw.Draw(phone)
+    icon = tile(int(width * 0.24), style)
+    label = font(int(width * 0.042))
+    cell = int(width * 0.3)
+    x0, y0 = int(width * 0.1), int(height * 0.13)
+    for row in range(3):
+        for col in range(3):
+            x = x0 + col * cell
+            y = y0 + row * cell
+            if (row, col) == (0, 1):
+                phone.paste(icon, (x, y), icon)
+                draw.text((x + 4, y + icon.height + int(height * 0.012)), "AI Calc",
+                          font=label, fill=(238, 236, 250))
+            else:
+                placeholder = Image.new("RGBA", (int(width * 0.19), int(width * 0.19)),
+                                        (255, 255, 255, 24))
+                phone.paste(placeholder, (x, y), placeholder)
+    return phone
+
+
+def preview(style: str) -> Image.Image:
+    """One sheet: the icon big, the launcher masks, the sizes, and a home screen."""
+    art = tile(512, style)
+    W, H = 1620, 1120
+    sheet = Image.new("RGB", (W, H), (13, 11, 20))
+    draw = ImageDraw.Draw(sheet)
+    draw.text((60, 44), "AI Calculator — launcher icon", font=font(48, bold=True),
+              fill=(242, 240, 252))
+    draw.text((60, 108),
+              f"style: {style}   ·   drawn by tools/make_icons.py   ·   crisp from 48 px to 512 px",
+              font=font(23), fill=(156, 150, 186))
+
+    # the icon, big, with a soft shadow
+    hero = Image.new("RGBA", (600, 560), (0, 0, 0, 0))
+    big = art.resize((430, 430), Image.LANCZOS)
+    dark = Image.new("RGBA", big.size, (0, 0, 0, 190))
+    dark.putalpha(big.getchannel("A").point(lambda v: int(v * 0.72)))
+    drop = Image.new("RGBA", hero.size, (0, 0, 0, 0))
+    drop.alpha_composite(dark, (85, 85))
+    hero.alpha_composite(drop.filter(ImageFilter.GaussianBlur(30)))
+    hero.alpha_composite(big, (85, 65))
+    sheet.paste(hero, (30, 165), hero)
+
+    # the shapes a launcher may use
+    x = 620
+    for label, img in (("adaptive · circle", round_tile(360, style)),
+                       ("adaptive · squircle", tile(360, style)),
+                       ("store · 512px", art)):
+        thumb = img.resize((172, 172), Image.LANCZOS)
+        sheet.paste(thumb, (x, 195), thumb)
+        draw.text((x, 385), label, font=font(20), fill=(158, 152, 188))
+        x += 200
+
+    # the sizes the phone actually uses
+    draw.text((620, 450), "sizes", font=font(24, bold=True), fill=(214, 210, 238))
+    x = 620
+    for size in (192, 144, 96, 48):
+        icon = tile(size, style)
+        sheet.paste(icon, (x, 500 + (192 - size) // 2), icon)
+        draw.text((x + 4, 720), f"{size}px", font=font(19), fill=(140, 134, 172))
+        x += 150
+
+    # the themed (monochrome) icon on a dark wallpaper
+    draw.text((620, 790), "themed · Android 13+", font=font(24, bold=True), fill=(214, 210, 238))
+    themed = Image.new("RGBA", (176, 176), (23, 25, 33, 255))
+    mono = monochrome(150)
+    themed.paste((198, 202, 216, 255), (13, 13), mono)
+    sheet.paste(themed, (620, 840), themed)
+    draw.text((624, 1032), "tinted by the system", font=font(19), fill=(150, 145, 180))
+
+    mock = phone_mock(style)
+    sheet.paste(mock, (1250, 175), mock)
+    draw.text((1256, 895), "home screen", font=font(21), fill=(160, 154, 190))
+    return sheet
+
+
+def concepts(styles=STYLES) -> Image.Image:
+    cell = 300
+    W, H = 60 + len(styles) * (cell + 40), 560
+    sheet = Image.new("RGB", (W, H), (13, 11, 20))
+    draw = ImageDraw.Draw(sheet)
+    draw.text((60, 40), "Icon styles — keep the shipping one, or ask for another",
+              font=font(32, bold=True), fill=(242, 240, 252))
+    notes = {
+        "card": "solid white body, lit keys",
+        "outline": "line-art body, white display",
+        "glyph": "no body — display and keys only",
+    }
+    for i, style in enumerate(styles):
+        x = 60 + i * (cell + 40)
+        icon = tile(cell, style)
+        sheet.paste(icon, (x, 120), icon)
+        tag = "  ← shipping" if style == styles[0] else ""
+        draw.text((x, 120 + cell + 30), style + tag, font=font(26, bold=True), fill=(226, 222, 246))
+        draw.text((x, 120 + cell + 70), notes.get(style, ""), font=font(20), fill=(148, 143, 178))
+    return sheet
+
+
+# --------------------------------------------------------------------------- #
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Draw the AI Calculator launcher icon.")
+    parser.add_argument("--style", choices=STYLES, default="card")
+    parser.add_argument("--concepts", action="store_true",
+                        help="write assets/icon-styles.png instead of the app icons")
+    args = parser.parse_args()
+
+    if args.concepts:
+        out = ASSETS / "icon-styles.png"
+        write(concepts(), out)
+        print(f"wrote {out.relative_to(ROOT)}")
+        return 0
+
+    total = 0
+    for density, size in DENSITIES.items():
+        folder = ROOT / "app" / "src" / "main" / "res" / f"mipmap-{density}"
+        canvas = int(round(size * 1.5))
+        total += write(tile(size, args.style), folder / "ic_launcher.png")
+        total += write(round_tile(size, args.style), folder / "ic_launcher_round.png")
+        total += write(adaptive_background(canvas), folder / "ic_launcher_background.png")
+        total += write(adaptive_foreground(canvas, args.style), folder / "ic_launcher_foreground.png")
+        total += write(monochrome(canvas // 2), folder / "ic_launcher_monochrome.png")
+        print(f"  mipmap-{density:<9} {size}px tile + 108dp layers")
+    total += write(tile(512, args.style), ASSETS / "play-store-icon-512.png")
+    total += write(preview(args.style), ASSETS / "app-icon-preview.png")
+    print("  assets/play-store-icon-512.png, assets/app-icon-preview.png")
+    print(f"style '{args.style}' — {total:,} bytes of icons")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

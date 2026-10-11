@@ -227,9 +227,29 @@ which re-computes every case with Python's `math` module using the same rounding
 rules as `Formatter`.
 
 ```bash
-python3 tools/make_icons.py     # regenerate the launcher icons
-python3 tools/reference.py      # print expected values for the tests
+python3 tools/make_icons.py               # redraw the launcher icons
+python3 tools/make_icons.py --concepts    # compare the three styles
+python3 tools/reference.py                # print expected values for the tests
 ```
+
+## The launcher icon
+
+The icon is drawn in code — `tools/make_icons.py` is Pillow-only (the build
+environment has no SVG rasteriser), so the same geometry renders at every
+density: a violet gradient tile with a white calculator, a violet display, nine
+lavender keys and the `=` key in the brand violet.
+
+```bash
+python3 tools/make_icons.py                     # style "card" — the shipping icon
+python3 tools/make_icons.py --style outline     # line-art alternative
+python3 tools/make_icons.py --style glyph       # display and keys only
+```
+
+Each run writes `ic_launcher`, `ic_launcher_round`, the adaptive background,
+foreground and monochrome layers for all five densities, `assets/play-store-icon-512.png`
+and `assets/app-icon-preview.png` (the sheet that shows the icon, the launcher
+masks, every size and a home screen). `assets/icon-styles.png` compares the three
+styles side by side.
 
 ## Continuous integration
 
