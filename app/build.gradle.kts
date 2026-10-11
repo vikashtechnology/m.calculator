@@ -23,6 +23,7 @@ android {
     val telemetryUrl: String = (findProperty("telemetryUrl") as String?) ?: ""
     val geminiKey: String = (findProperty("geminiApiKey") as String?) ?: ""
     val geminiModelName: String = (findProperty("geminiModel") as String?) ?: ""
+    val aiProxy: String = (findProperty("aiProxyUrl") as String?) ?: ""
 
     defaultConfig {
         applicationId = "com.advanceai.calculator"
@@ -41,6 +42,8 @@ android {
         // A Google AI Studio key turns Ask AI into the native Gemini screen.
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
         buildConfigField("String", "GEMINI_MODEL", "\"$geminiModelName\"")
+        // The stats Worker that holds the API key and checks Google sign-ins.
+        buildConfigField("String", "AI_PROXY_URL", "\"$aiProxy\"")
     }
 
     signingConfigs {

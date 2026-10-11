@@ -99,31 +99,39 @@ between them. Every field recalculates as you type — there is no Solve button.
 | **Age** | Age in years/months/days plus total days/weeks/months and days to the next birthday |
 
 ### Ask AI and Google (optional, needs internet)
-Ask AI has two modes, picked automatically at build time:
+Ask AI can run three ways; the build picks the best one it has:
 
-**Native (recommended)** — set a Google AI Studio key (`GEMINI_API_KEY` secret, or
-`-PgeminiApiKey=`); the app then talks to Gemini directly:
+**1. Through your own Worker (best for users — Google OAuth)**
+Set `AI_PROXY_URL` (the Worker from `admin/worker`) and `GOOGLE_WEB_CLIENT_ID`:
 
-* **Continue with Google** opens the phone's own account picker (Credential
-  Manager) — the Google accounts already on the device, no web login page
-* the same Google account owns the key, so the usage is tracked on that account
-* the upload (photo, PDF or text) is sent from the app; nothing is stored by it
-* needs the AI Studio key, which takes a minute at aistudio.google.com → *Get API key*
+* the user taps **Continue with Google** and the phone's own account picker opens
+  (Credential Manager — the accounts already on the device, no password page)
+* the app sends the ID token with the question; the **Worker verifies that token
+  against Google's published keys** and only then asks Gemini with the key it
+  holds as a secret — so no key is ever in the APK and users have nothing to set up
+* the same Worker also serves the dashboard, so there is one deploy for both
 
-**Web page** — without a key, the bundled `assets/ai/index.html` runs Puter.js in a
-WebView, exactly as before:
+**2. Straight from the app (a key in the build)**
+Set `GEMINI_API_KEY` (or `-PgeminiApiKey=`): the app calls Gemini directly. Simple,
+and the key is yours alone — users still only need the app. Use this when you have
+not deployed the Worker.
 
-* sign in with a Puter account, or create a temporary one with *Continue as guest*
-* note that Puter's own *Sign in with Google* opens **Google's web sign-in page**:
-  Google deliberately keeps the phone's accounts out of embedded browsers, so that
-  page asks for the password again (and may refuse the browser outright). Sign in
-  with a Puter email/password there, or use the native mode above
+**3. The bundled Puter page (no configuration at all)**
+Without either, `assets/ai/index.html` runs Puter.js in a WebView: sign in with a
+Puter account or *Continue as guest*. Note that Puter's own *Sign in with Google*
+opens **Google's web sign-in page** — Google deliberately keeps the phone's accounts
+out of embedded browsers, so that page asks for the password again and can refuse
+the browser outright. That is the case the Worker mode above replaces.
 
-To also show the native **Continue with Google** button, register the signing
-certificate's SHA-1 (see `app/signing/fingerprints.txt`) for the package name
-`com.advanceai.calculator` in the Google Cloud console → *APIs & Services* →
-*Credentials* → *Create OAuth client ID* → Android, create a second client ID of
-type **Web**, and store it as `GOOGLE_WEB_CLIENT_ID` (or `-PgoogleWebClientId=`).
+To use Google sign-in at all, register the signing certificate's SHA-1 (see
+`app/signing/fingerprints.txt`) for the package name `com.advanceai.calculator` in
+the Google Cloud console → *APIs & Services* → *Credentials* → *Create OAuth client
+ID* → **Android**, create a second client ID of type **Web**, then:
+
+* app builds: `GOOGLE_WEB_CLIENT_ID` secret (or `-PgoogleWebClientId=`)
+* Worker deploys: the same Web client ID (`wrangler secret put GOOGLE_WEB_CLIENT_ID`)
+  so it can check the tokens it receives
+
 Every build is signed with the key in `app/signing/`, so that fingerprint never
 changes and Android updates install straight over the previous version.
 
@@ -187,9 +195,10 @@ Toolchain: AGP 8.5.2, Kotlin 2.0.21, Gradle 8.9, JDK 17, compileSdk 34, minSdk 2
 Optional build properties (all safe to leave out):
 
 ```bash
--PgeminiApiKey=…        # native Ask AI (Gemini) + device Google account picker
+-PaiProxyUrl=…          # Ask AI through your Worker: users just sign in with Google
+-PgoogleWebClientId=…   # the Web OAuth client ID every Google sign-in needs
+-PgeminiApiKey=…        # alternative: call Gemini straight from the app
 -PgeminiModel=…         # optional model override, default gemini-2.5-flash
--PgoogleWebClientId=…   # enables "Continue with Google" on the web-page mode
 -PtelemetryUrl=…        # sends anonymous usage counts to the admin dashboard
 ```
 

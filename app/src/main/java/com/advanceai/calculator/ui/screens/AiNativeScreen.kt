@@ -75,8 +75,10 @@ fun AiNativeScreen(
     var busy by remember { mutableStateOf(false) }
     var answer by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var googleEmail by remember { mutableStateOf("") }
+    var googleEmail by remember { mutableStateOf(GoogleSignIn.cachedEmail(context)) }
     var googleBusy by remember { mutableStateOf(false) }
+    // Proxy mode means the Worker checks a Google sign-in before it answers.
+    var signedIn by remember { mutableStateOf(GoogleSignIn.isSignedIn(context)) }
 
     BackHandler { onClose() }
 
@@ -108,6 +110,7 @@ fun AiNativeScreen(
             when {
                 result.ok -> {
                     googleEmail = result.email
+                    signedIn = true
                     showMessage("Signed in as ${result.email}")
                 }
                 result.error == "cancelled" -> Unit
@@ -171,6 +174,13 @@ fun AiNativeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
+            if (GeminiClient.usesProxy && !signedIn) {
+                GoogleGateCard(
+                    busy = googleBusy,
+                    configured = GoogleSignIn.isConfigured,
+                    onSignIn = { signInWithGoogle() }
+                )
+            } else {
             val current = picked
             Surface(
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -262,6 +272,12 @@ fun AiNativeScreen(
             Button(
                 onClick = {
                     val file = picked ?: return@Button
+                    val token = GoogleSignIn.cachedToken(context)
+                    if (GeminiClient.usesProxy && token == null) {
+                        signedIn = false
+                        showMessage("Please sign in with Google again to continue")
+                        return@Button
+                    }
                     busy = true
                     answer = null
                     error = null
@@ -272,10 +288,18 @@ fun AiNativeScreen(
                                 mimeType = file.mimeType,
                                 bytes = file.bytes,
                                 name = file.name
-                            )
+                            ),
+                            idToken = token
                         )
                         busy = false
-                        if (result.ok) answer = result.text else error = result.error
+                        when {
+                            result.ok -> answer = result.text
+                            result.error == "sign_in_required" -> {
+                                signedIn = false
+                                showMessage("Your sign-in was not accepted — tap Continue with Google")
+                            }
+                            else -> error = result.error
+                        }
                     }
                 },
                 enabled = picked != null && !busy,
@@ -357,11 +381,58 @@ fun AiNativeScreen(
             }
 
             Text(
-                text = "The file goes to Google's Gemini API with the model " +
-                    "\"${GeminiClient.model}\" and nothing is stored by this app.",
+                text = if (GeminiClient.usesProxy) {
+                    "The file goes to your own stats Worker, which asks Gemini " +
+                        "\"${GeminiClient.model}\" on your signed-in behalf. Nothing is stored by this app."
+                } else {
+                    "The file goes to Google's Gemini API with the model " +
+                        "\"${GeminiClient.model}\" and nothing is stored by this app."
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 18.dp)
+            )
+            }
+        }
+    }
+}
+
+/** The "just tap Continue with Google" gate: no key, no password. */
+@Composable
+private fun GoogleGateCard(
+    busy: Boolean,
+    configured: Boolean,
+    onSignIn: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text("Sign in to use Ask AI", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "One tap and you are in: the AI runs under your Google " +
+                    "account, so there is no key to paste and nothing to set up.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Button(onClick = onSignIn, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Text(text = if (busy) "Signing in…" else "Continue with Google")
+            }
+            Text(
+                text = if (configured) {
+                    "Your phone's own account picker opens — the accounts already on this device."
+                } else {
+                    "This build still needs the GOOGLE_WEB_CLIENT_ID secret to reach the " +
+                        "account picker. Until then, builds with a GEMINI_API_KEY use the " +
+                        "key mode instead."
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

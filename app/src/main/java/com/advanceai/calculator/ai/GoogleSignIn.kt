@@ -3,6 +3,7 @@ package com.advanceai.calculator.ai
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.SharedPreferences
 import android.util.Log
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
@@ -27,6 +28,13 @@ import com.advanceai.calculator.BuildConfig
 object GoogleSignIn {
 
     private const val Tag = "GoogleSignIn"
+    private const val PrefsName = "m_calculator_google"
+    private const val KeyToken = "id_token"
+    private const val KeyEmail = "email"
+    private const val KeyIssuedAt = "issued_at"
+
+    /** Google ID tokens last an hour; ask for a fresh one before that. */
+    private const val TokenLifetimeMs = 55 * 60 * 1000L
 
     /** Web OAuth client ID, or an empty string when Google Sign-In is off. */
     val webClientId: String = BuildConfig.GOOGLE_WEB_CLIENT_ID
@@ -56,6 +64,7 @@ object GoogleSignIn {
 
     /** Forgets the account so the next tap shows the account picker again. */
     suspend fun signOut(context: Context) {
+        forget(context)
         if (!isConfigured) return
         try {
             CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest())
@@ -63,6 +72,39 @@ object GoogleSignIn {
             Log.w(Tag, "clearCredentialState failed", e)
         }
     }
+
+    /**
+     * The token handed to the stats Worker for Ask AI, or null when the user has
+     * not signed in (or the token is old enough that Google would refuse it).
+     */
+    fun cachedToken(context: Context): String? {
+        val sp = prefs(context)
+        val token = sp.getString(KeyToken, null)
+        if (token.isNullOrBlank()) return null
+        val age = System.currentTimeMillis() - sp.getLong(KeyIssuedAt, 0L)
+        return if (age in 0 until TokenLifetimeMs) token else null
+    }
+
+    /** The signed-in Google address, or an empty string. */
+    fun cachedEmail(context: Context): String =
+        prefs(context).getString(KeyEmail, "").orEmpty()
+
+    fun isSignedIn(context: Context): Boolean = cachedToken(context) != null
+
+    private fun remember(context: Context, token: String, email: String) {
+        prefs(context).edit()
+            .putString(KeyToken, token)
+            .putString(KeyEmail, email)
+            .putLong(KeyIssuedAt, System.currentTimeMillis())
+            .apply()
+    }
+
+    private fun forget(context: Context) {
+        prefs(context).edit().clear().apply()
+    }
+
+    private fun prefs(context: Context): SharedPreferences =
+        context.applicationContext.getSharedPreferences(PrefsName, Context.MODE_PRIVATE)
 
     private suspend fun requestCredential(context: Context): Result {
         val option = GetGoogleIdOption.Builder()
@@ -85,6 +127,7 @@ object GoogleSignIn {
                 credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
             ) {
                 val token = GoogleIdTokenCredential.createFrom(credential.data)
+                remember(context, token.idToken, token.id)
                 Result(
                     ok = true,
                     idToken = token.idToken,

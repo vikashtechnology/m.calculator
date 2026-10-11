@@ -90,9 +90,10 @@ fun HelpSheet(onDismiss: () -> Unit) {
                     "Tap the Ask AI card at the top of the pad, or the Ask AI row in the menu.",
                     "Upload a photo, a PDF or a text file of a question, then press Solve this question.",
                     "It only solves the question in the file you upload, with the steps.",
-                    "Native mode (with a Gemini key): 'Google' in the header opens the phone's own",
-                    "account picker. Web-page mode signs in to Puter instead — its Google button opens",
-                    "Google's web page, which cannot list the accounts on the phone.",
+                    "With Google sign-in: tap Continue with Google once and the phone's own account",
+                    "picker opens — no key to paste and no password page; the AI runs under that account.",
+                    "Web-page mode signs in to Puter instead; its Google button opens Google's web page,",
+                    "which cannot list the accounts on the phone.",
                     "Ask AI needs internet; everything else in the app works offline."
                 )
             )

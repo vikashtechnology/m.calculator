@@ -3,6 +3,8 @@
  *
  * One Worker, no dependencies, no build step:
  *   POST /v1/events        the app posts anonymous counters here
+ *   POST /v1/solve        Ask AI: verifies the user's Google sign-in and asks
+ *                         Gemini with the key kept here, never in the app
  *   GET  /v1/stats        aggregated numbers for the dashboard (JSON)
  *   GET  /                the dashboard itself (asks for the admin token)
  *
@@ -23,6 +25,9 @@ export default {
     }
     if (url.pathname === "/v1/events") {
       return handleEvents(request, env);
+    }
+    if (url.pathname === "/v1/solve") {
+      return handleSolve(request, env);
     }
     if (url.pathname === "/v1/stats") {
       return handleStats(request, env, url);
@@ -100,6 +105,217 @@ async function handleEvents(request, env) {
     return json({ error: "database error", detail: String(error) }, 500);
   }
   return json({ ok: true, stored: rows.length });
+}
+
+/* ---------------------------------------------------------------------------- *
+ * Ask AI (OAuth in, answer out)
+ *
+ * The app sends the user's Google ID token; this Worker checks the signature
+ * against Google's published keys, and only then calls Gemini with the key that
+ * lives here as a secret. Users never see or need an API key: they tap
+ * "Continue with Google" and ask away.
+ * ---------------------------------------------------------------------------- */
+
+const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
+const GOOGLE_CERTS_URL = "https://www.googleapis.com/oauth2/v3/certs";
+const GOOGLE_ISSUERS = ["accounts.google.com", "https://accounts.google.com"];
+const DEFAULT_MODEL = "gemini-2.5-flash";
+
+let certsCache = { keys: null, at: 0 };
+let certsFetch = null;
+
+function base64UrlToBytes(value) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function base64UrlToString(value) {
+  return new TextDecoder().decode(base64UrlToBytes(value));
+}
+
+async function googleKeys() {
+  const fresh = Date.now() - certsCache.at < 30 * 60 * 1000;
+  if (certsCache.keys && fresh) return certsCache.keys;
+  if (!certsFetch) {
+    certsFetch = fetch(GOOGLE_CERTS_URL)
+      .then((response) => response.json())
+      .then((data) => {
+        certsCache = { keys: data.keys ?? [], at: Date.now() };
+        certsFetch = null;
+        return certsCache.keys;
+      })
+      .catch((error) => {
+        certsFetch = null;
+        throw error;
+      });
+  }
+  return certsFetch;
+}
+
+/** Returns the token's claims when it really is a Google token for this app. */
+async function verifyGoogleIdToken(token, audience) {
+  const parts = String(token ?? "").split(".");
+  if (parts.length !== 3) return null;
+
+  let header;
+  let claims;
+  try {
+    header = JSON.parse(base64UrlToString(parts[0]));
+    claims = JSON.parse(base64UrlToString(parts[1]));
+  } catch {
+    return null;
+  }
+  if (header.alg !== "RS256") return null;
+
+  const now = Math.floor(Date.now() / 1000);
+  if (typeof claims.exp !== "number" || claims.exp < now) return null;
+  if (claims.aud !== audience) return null;
+  if (!GOOGLE_ISSUERS.includes(claims.iss)) return null;
+
+  const keys = await googleKeys();
+  const jwk = keys.find((key) => key.kid === header.kid);
+  if (!jwk) return null;
+
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", ext: true },
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+  const signed = new TextEncoder().encode(parts[0] + "." + parts[1]);
+  const ok = await crypto.subtle.verify(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    base64UrlToBytes(parts[2]),
+    signed
+  );
+  return ok ? claims : null;
+}
+
+function solverPrompt() {
+  return [
+    "You are the solver inside a maths calculator app.",
+    "Solve only the question contained in the file the user uploads.",
+    "Reply with the answer first, then the steps, using short lines and plain",
+    "text maths (^ for powers, sqrt() for roots, * for multiplication).",
+    'If the upload does not contain a maths question, reply exactly:',
+    '"I could not find a maths question in this file." Never invent a question,',
+    "and never solve anything that is not in the file.",
+  ].join(" ");
+}
+
+async function handleSolve(request, env) {
+  if (request.method !== "POST") return json({ error: "use POST" }, 405);
+
+  if (!env.GEMINI_API_KEY) {
+    return json({ error: "This worker has no GEMINI_API_KEY secret yet." }, 503);
+  }
+
+  const header = request.headers.get("authorization") ?? "";
+  const token = header.toLowerCase().startsWith("bearer ") ? header.slice(7).trim() : "";
+
+  let user = null;
+  if (env.GOOGLE_WEB_CLIENT_ID) {
+    try {
+      user = await verifyGoogleIdToken(token, env.GOOGLE_WEB_CLIENT_ID);
+    } catch (error) {
+      return json({ error: "Could not check the sign-in: " + String(error) }, 502);
+    }
+    if (!user) {
+      return json({ error: "Sign in with Google to use Ask AI." }, 401);
+    }
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "invalid json" }, 400);
+  }
+
+  const attachment = body.attachment ?? null;
+  if (!attachment || typeof attachment.data !== "string" || attachment.data.length === 0) {
+    return json({ error: "No file was uploaded." }, 400);
+  }
+  if (attachment.data.length > 22_000_000) {
+    return json({ error: "That file is larger than 15 MB. Try a screenshot instead." }, 413);
+  }
+
+  const model = /^[a-zA-Z0-9._-]{1,60}$/.test(String(body.model ?? ""))
+    ? body.model
+    : DEFAULT_MODEL;
+
+  const parts = [{ text: solverPrompt() }];
+  const question = String(body.question ?? "").slice(0, 2000).trim();
+  if (question) parts.push({ text: "The user also added: " + question });
+  parts.push({
+    inlineData: {
+      mimeType: String(attachment.mimeType ?? "application/octet-stream").slice(0, 100),
+      data: attachment.data,
+    },
+  });
+
+  const payload = {
+    contents: [{ role: "user", parts }],
+    generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+  };
+
+  let response;
+  try {
+    response = await fetch(
+      GEMINI_ENDPOINT + "/" + encodeURIComponent(model) + ":generateContent",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": env.GEMINI_API_KEY,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+  } catch (error) {
+    return json({ error: "Could not reach Gemini: " + String(error) }, 502);
+  }
+
+  const text = await response.text();
+  if (!response.ok) {
+    let message = "The model could not answer that (HTTP " + response.status + ").";
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed?.error?.message) message = parsed.error.message;
+    } catch {
+      /* keep the generic message */
+    }
+    if (response.status === 429) message = "Too many questions just now. Try again shortly.";
+    return json({ error: message }, response.status);
+  }
+
+  let answer = "";
+  let blocked = "";
+  try {
+    const parsed = JSON.parse(text);
+    blocked = parsed?.promptFeedback?.blockReason ?? "";
+    const pieces = parsed?.candidates?.[0]?.content?.parts ?? [];
+    answer = pieces.map((piece) => piece.text ?? "").join("").trim();
+    if (!answer && parsed?.candidates?.[0]?.finishReason) {
+      blocked = blocked || parsed.candidates[0].finishReason;
+    }
+  } catch {
+    return json({ error: "Gemini sent something unreadable." }, 502);
+  }
+
+  if (!answer) {
+    return json(
+      { error: blocked ? "That upload was blocked (" + blocked + ")." : "No answer came back." },
+      502
+    );
+  }
+
+  return json({ answer, by: user ? user.email ?? user.sub ?? "" : "" });
 }
 
 async function handleStats(request, env, url) {

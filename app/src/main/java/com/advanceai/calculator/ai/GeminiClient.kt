@@ -19,9 +19,15 @@ import java.net.URLEncoder
  * account picker instead of Google's web login page: there is no embedded
  * browser for Google to refuse.
  *
- * The API key comes from the build (see gradle.properties / the GEMINI_API_KEY
- * repository secret). Without a key [isConfigured] is false and the Ask AI
- * screen keeps using the bundled Puter page.
+ * Two ways to reach the model, picked at build time:
+ *
+ * 1. Through the stats Worker ([proxyUrl]): the user signs in with Google and
+ *    the Worker — which holds the API key as a secret — checks that sign-in and
+ *    asks Gemini. Users need no key at all; this is the "just tap Continue with
+ *    Google" mode.
+ * 2. Directly with a key baked into the build ([apiKey]).
+ *
+ * With neither, the bundled Puter page is used instead.
  */
 object GeminiClient {
 
@@ -34,8 +40,16 @@ object GeminiClient {
     val apiKey: String = BuildConfig.GEMINI_API_KEY
     val model: String = BuildConfig.GEMINI_MODEL.ifBlank { "gemini-2.5-flash" }
 
+    /** The Worker that holds the key and checks Google sign-ins, if any. */
+    val proxyUrl: String = BuildConfig.AI_PROXY_URL.trimEnd('/')
+
+    /** True when the AI is reached with the user's Google sign-in, not a key. */
+    val usesProxy: Boolean
+        get() = proxyUrl.isNotBlank()
+
+    /** True when Ask AI can run natively at all. */
     val isConfigured: Boolean
-        get() = apiKey.isNotBlank()
+        get() = usesProxy || apiKey.isNotBlank()
 
     /** A file the user picked: the bytes are what actually gets sent. */
     data class Attachment(
@@ -64,8 +78,86 @@ object GeminiClient {
         append("Never invent a question, and never solve anything that is not in the file.")
     }
 
-    suspend fun solve(question: String, attachment: Attachment?): Answer =
-        withContext(Dispatchers.IO) { request(question, attachment) }
+    /**
+     * [idToken] is the Google ID token from Credential Manager; it is what the
+     * Worker checks when [usesProxy] is true.
+     */
+    suspend fun solve(
+        question: String,
+        attachment: Attachment?,
+        idToken: String? = null
+    ): Answer = withContext(Dispatchers.IO) {
+        if (usesProxy) requestProxy(question, attachment, idToken)
+        else request(question, attachment)
+    }
+
+    /** How the attachment travels: base64 in JSON, for either endpoint. */
+    private fun encoded(attachment: Attachment): String =
+        Base64.encodeToString(attachment.bytes, Base64.NO_WRAP)
+
+    private fun requestProxy(
+        question: String,
+        attachment: Attachment?,
+        idToken: String?
+    ): Answer {
+        if (attachment == null) return Answer(ok = false, error = "Choose a file first.")
+        if (idToken.isNullOrBlank()) {
+            return Answer(ok = false, error = "sign_in_required")
+        }
+        if (attachment.bytes.size > MaxAttachmentBytes) {
+            return Answer(ok = false, error = "That file is larger than 15 MB. Try a screenshot instead.")
+        }
+
+        val body = JSONObject()
+            .put("model", model)
+            .put("question", question)
+            .put(
+                "attachment",
+                JSONObject()
+                    .put("mimeType", attachment.mimeType)
+                    .put("name", attachment.name)
+                    .put("data", encoded(attachment))
+            )
+            .toString()
+            .toByteArray(Charsets.UTF_8)
+
+        val connection = (URL("$proxyUrl/v1/solve").openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            connectTimeout = 20_000
+            readTimeout = 120_000
+            doOutput = true
+            setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            setRequestProperty("Authorization", "Bearer $idToken")
+            setRequestProperty("Content-Length", body.size.toString())
+        }
+
+        return try {
+            connection.outputStream.use { it.write(body) }
+            val code = connection.responseCode
+            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+            val text = stream?.bufferedReader()?.use { reader -> reader.readText() }.orEmpty()
+            val json = runCatching { JSONObject(text) }.getOrNull()
+            when {
+                code == 401 -> Answer(ok = false, error = "sign_in_required")
+                code in 200..299 -> {
+                    val answer = json?.optString("answer").orEmpty()
+                    if (answer.isNotBlank()) Answer(ok = true, text = answer)
+                    else Answer(ok = false, error = "No answer came back. Try again.")
+                }
+                else -> Answer(
+                    ok = false,
+                    error = json?.optString("error").orEmpty().ifBlank {
+                        "The solver answered HTTP $code."
+                    }
+                )
+            }
+        } catch (e: Exception) {
+            Log.w(Tag, "Worker request failed", e)
+            Answer(ok = false, error = e.message ?: "The request failed. Check the connection.")
+        } finally {
+            connection.disconnect()
+        }
+    }
 
     private fun request(question: String, attachment: Attachment?): Answer {
         if (!isConfigured) return Answer(ok = false, error = "not_configured")
@@ -85,7 +177,7 @@ object GeminiClient {
                         "inlineData",
                         JSONObject()
                             .put("mimeType", attachment.mimeType)
-                            .put("data", Base64.encodeToString(attachment.bytes, Base64.NO_WRAP))
+                            .put("data", encoded(attachment))
                     )
                 )
             }

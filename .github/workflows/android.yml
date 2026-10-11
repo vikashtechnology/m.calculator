@@ -68,6 +68,9 @@ jobs:
           # Puter page is used.
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          # Optional: the same Worker URL as TELEMETRY_URL. With it, Ask AI runs
+          # on the user's Google sign-in and the key stays on the Worker.
+          AI_PROXY_URL: ${{ secrets.AI_PROXY_URL }}
         run: |
           set -o pipefail
           GRADLE_ARGS=""
@@ -78,6 +81,10 @@ jobs:
             echo "Google Sign-In: off (no GOOGLE_WEB_CLIENT_ID secret)"
             echo "Signing SHA-1 for registration:"
             cat app/signing/fingerprints.txt | grep "SHA-1"
+          fi
+          if [ -n "$AI_PROXY_URL" ]; then
+            GRADLE_ARGS="$GRADLE_ARGS -PaiProxyUrl=$AI_PROXY_URL"
+            echo "Ask AI: OAuth through the Worker (no key in the app)"
           fi
           if [ -n "$GEMINI_API_KEY" ]; then
             GRADLE_ARGS="$GRADLE_ARGS -PgeminiApiKey=$GEMINI_API_KEY"
