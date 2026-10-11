@@ -14,12 +14,10 @@ import java.net.URL
 import java.net.URLEncoder
 
 /**
- * Ask AI without a WebView.
+ * The Gemini client behind the Ask AI chat.
  *
- * Sends the uploaded question (photo, PDF or text) straight to the Gemini API
- * from the app, which is why the account step can use the phone's own Google
- * account picker instead of Google's web login page: there is no embedded
- * browser for Google to refuse.
+ * Sends the question — typed, or a photo, PDF or text file — straight to the
+ * Gemini API from the app. Default model: Gemini 3.6 Flash.
  *
  * The key is the user's own: they paste it once on the Ask AI screen (see
  * [UserKeys]) and it is kept in the app's private storage. Nothing to sign up
@@ -106,7 +104,7 @@ object GeminiClient {
     suspend fun solve(question: String, attachment: Attachment?): Answer =
         withContext(Dispatchers.IO) { request(question, attachment) }
 
-    /** How the attachment travels: base64 in JSON, for either endpoint. */
+    /** How an attachment travels: base64 inside the JSON request. */
     private fun encoded(attachment: Attachment): String =
         Base64.encodeToString(attachment.bytes, Base64.NO_WRAP)
 
