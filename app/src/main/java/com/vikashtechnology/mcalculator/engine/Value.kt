@@ -41,8 +41,16 @@ data class Num(val re: Double, val im: Double = 0.0) : Value {
     val abs: Double
         get() = if (isRealScalar) Math.abs(re) else Math.hypot(re, im)
 
+    /**
+     * Argument in radians. Negative real numbers return exactly π even when the
+     * imaginary part is -0.0 (which `atan2` would otherwise read as -π).
+     */
     val arg: Double
-        get() = Math.atan2(im, re)
+        get() = if (im == 0.0) {
+            if (re < 0.0) Math.PI else 0.0
+        } else {
+            Math.atan2(im, re)
+        }
 
     companion object {
         val ZERO = Num(0.0)

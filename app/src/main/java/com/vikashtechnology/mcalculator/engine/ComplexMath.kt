@@ -31,7 +31,10 @@ object ComplexMath {
         // The scaled form above avoids overflow when one part dominates.
     }
 
-    fun neg(a: Num): Num = Num(-a.re, -a.im)
+    fun neg(a: Num): Num = Num(
+        if (a.re == 0.0) 0.0 else -a.re,
+        if (a.im == 0.0) 0.0 else -a.im
+    )
 
     fun abs(a: Num): Num = Num(a.abs)
 

@@ -16,7 +16,7 @@ class CalculusTest {
 
         val sine = CalculatorEngine.parse("sin(x)")
         assertEquals(1.0, Calculus.derivative(sine, "x", 0.0, ctx), 1e-6)
-        assertEquals(0.0, Calculus.derivative(sine, "x", Math.PI, ctx), 1e-5)
+        assertEquals(-1.0, Calculus.derivative(sine, "x", Math.PI, ctx), 1e-5) // d/dx sin = cos, cos(π) = -1
 
         val cubic = CalculatorEngine.parse("x^3 - 3x + 1")
         assertEquals(0.0, Calculus.derivative(cubic, "x", 1.0, ctx), 1e-6)
@@ -85,7 +85,7 @@ class CalculusTest {
         val summary = Calculus.describe(data)
         assertEquals(8, summary.count)
         assertEquals(5.0, summary.mean, 1e-12)
-        assertEquals(5.0, summary.median, 1e-12)
+        assertEquals(4.5, summary.median, 1e-12) // (4 + 5) / 2 for an even count
         assertEquals(2.0, summary.min, 1e-12)
         assertEquals(9.0, summary.max, 1e-12)
         assertEquals(2.138089935299395, summary.stdevSample, 1e-12)

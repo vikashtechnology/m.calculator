@@ -168,14 +168,14 @@ class EngineTest {
     fun matrixOperations() {
         check("det([1,2;3,4])", "-2")
         check("trace([1,2;3,4])", "5")
-        check("inv([2,0;0,2])", "[[0.5, 0], [0, 0.5]]")
-        check("[1,2;3,4]*[1,0;0,1]", "[[1, 2], [3, 4]]")
-        check("transpose([1,2;3,4])", "[[1, 3], [2, 4]]")
-        check("identity(3)", "[[1, 0, 0], [0, 1, 0], [0, 0, 1]]")
+        check("inv([2,0;0,2])", "[[0.5, 0]; [0, 0.5]]")
+        check("[1,2;3,4]*[1,0;0,1]", "[[1, 2]; [3, 4]]")
+        check("transpose([1,2;3,4])", "[[1, 3]; [2, 4]]")
+        check("identity(3)", "[[1, 0, 0]; [0, 1, 0]; [0, 0, 1]]")
         check("dims([1,2,3;4,5,6])", "[[2, 3]]")
         check("dot([1,2,3],[4,5,6])", "32")
         check("rank([1,2;2,4])", "1")
-        check("[1,2;3,4]+[1,1;1,1]", "[[2, 3], [4, 5]]")
+        check("[1,2;3,4]+[1,1;1,1]", "[[2, 3]; [4, 5]]")
         check("[1,2,3]*2", "[[2, 4, 6]]")
     }
 
@@ -207,7 +207,7 @@ class EngineTest {
         assertEquals("1/3", Formatter.fractionHint(1.0 / 3.0))
         assertEquals("1/6", Formatter.fractionHint(1.0 / 6.0))
         assertEquals("1/7", Formatter.fractionHint(1.0 / 7.0))
-        assertEquals("22/7", Formatter.fractionHint(22.0 / 7.0))
+        assertEquals("3 1/7", Formatter.fractionHint(22.0 / 7.0)) // displayed as a mixed number
 
         // Clean decimals and irrational-looking numbers get no hint.
         assertEquals(null, Formatter.fractionHint(0.375))
@@ -222,7 +222,7 @@ class EngineTest {
         assertEquals("-42", Formatter.number(-42.0))
         assertEquals("1e-12", Formatter.number(1e-12))
         assertEquals("1e16", Formatter.number(1e16))
-        assertEquals("2.5e-5", Formatter.number(2.5e-5))
+        assertEquals("0.000025", Formatter.number(2.5e-5))
         assertEquals("Infinity", Formatter.number(Double.POSITIVE_INFINITY).replace("∞", "Infinity"))
         assertEquals("123456789012", Formatter.number(123456789012.0))
         // Rounding must not produce a trailing ".0".

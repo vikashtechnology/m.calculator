@@ -132,9 +132,12 @@ object Calculus {
             scan@ for (i in 1..samples) {
                 val curX = min + i * step
                 val curF = safeEval(f, curX)
-                if (prevF != null && curF != null && prevF != 0.0 && curF != 0.0 &&
-                    (prevF > 0) != (curF > 0)
-                ) {
+                if (prevF != null && curF != null && prevF == 0.0) {
+                    // The scan grid landed exactly on a root.
+                    addRoot(prevX)
+                } else if (prevF != null && curF != null && curF == 0.0) {
+                    addRoot(curX)
+                } else if (prevF != null && curF != null && (prevF > 0) != (curF > 0)) {
                     var lo = prevX
                     var hi = curX
                     val loPositive = prevF > 0

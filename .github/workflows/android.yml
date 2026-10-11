@@ -107,6 +107,8 @@ jobs:
             echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Commit: $GITHUB_SHA"
             echo
+            echo "Unit tests: ${{ steps.tests.outcome }} — APK build: ${{ steps.apk.outcome }}"
+            echo
             echo '## Errors'
             echo '```'
             grep -h -E "^(e|w): |error: |What went wrong|Execution failed for task|FAILURE: Build|Caused by: [a-z]|\* Try|\* What went wrong|AAPT" ci-logs/*.log 2>/dev/null \
