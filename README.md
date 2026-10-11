@@ -176,6 +176,13 @@ blocks: the readout sits on a raised card, keypad keys are physical buttons, the
 menu and the chat header are elevated sheets, and chat bubbles lift off the chat
 background.
 
+The pad holds still: the keypad is laid out at one size — measured for the page
+with the most keys, so switching pages and an ad appearing both change nothing —
+and the readout above it takes every dp that is left over. The readout's text
+does the adapting instead: the expression and the answer start big and shrink to
+fit, so a short answer shows up large and a long one comes back smaller but
+whole rather than cut off.
+
 ## Building it yourself
 
 ```bash

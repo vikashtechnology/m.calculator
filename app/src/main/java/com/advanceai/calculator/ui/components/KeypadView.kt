@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.advanceai.calculator.ui.CalcKey
@@ -25,26 +28,50 @@ import com.advanceai.calculator.ui.Keypads
 import com.advanceai.calculator.ui.KeypadPage
 import com.advanceai.calculator.ui.KeyStyle
 
-/** Renders a full keypad page, sized to fill the space it is given. */
+/*
+ * Keypad geometry. These are shared with the pad screen, which asks for a
+ * keypad of exactly [keypadHeightFor] and gives the rest of the height to the
+ * readout — that is what keeps every key the same size whatever page is open,
+ * whatever the screen is, and whether or not an ad is showing.
+ */
+val KeypadGap = 6.dp
+
+/** The size a key is meant to be; keys only ever shrink if the screen cannot fit them. */
+val KeypadIdealKeyHeight = 54.dp
+
+/** The smallest a key may get before the keypad is allowed to overflow instead. */
+val KeypadMinKeyHeight = 38.dp
+
+/** Total height of a keypad with [rows] rows of keys [keyHeight] tall. */
+fun keypadHeightFor(rows: Int, keyHeight: Dp): Dp =
+    keyHeight * rows + KeypadGap * (rows - 1).coerceAtLeast(0)
+
+/**
+ * Renders a full keypad page with keys of a fixed [keyHeight], centred in the
+ * space it is given. The caller hands out a height measured for the busiest
+ * page, so a page with fewer rows keeps its keys the same size and the readout
+ * above the keypad does not move.
+ */
 @Composable
 fun Keypad(
     page: KeypadPage,
     second: Boolean,
     onKey: (CalcKey) -> Unit,
     onLongPressKey: (CalcKey) -> Unit,
+    keyHeight: Dp = KeypadIdealKeyHeight,
     modifier: Modifier = Modifier
 ) {
     val rows = Keypads.keysFor(page)
     Column(
-        modifier = modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(KeypadGap, Alignment.CenterVertically)
     ) {
         rows.forEach { row ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    .height(keyHeight),
+                horizontalArrangement = Arrangement.spacedBy(KeypadGap)
             ) {
                 row.forEach { key ->
                     KeyButton(
@@ -54,7 +81,7 @@ fun Keypad(
                         onLongClick = { onLongPressKey(key) },
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxSize()
+                            .fillMaxHeight()
                     )
                 }
             }

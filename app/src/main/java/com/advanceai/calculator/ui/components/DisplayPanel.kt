@@ -3,7 +3,7 @@ package com.advanceai.calculator.ui.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,7 +43,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.sp
@@ -86,7 +85,7 @@ fun DisplayPanel(
 
     Column(
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
         // --- status chips + actions -----------------------------------------
@@ -138,17 +137,30 @@ fun DisplayPanel(
         }
 
         // --- expression ------------------------------------------------------
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 76.dp, max = 132.dp)
         ) {
+            // The expression is one line, as large as the box allows: a short
+            // sum is big and readable, a long one shrinks until the whole of it
+            // fits, and only scrolls once it cannot shrink any further.
+            val expressionSize = rememberFittingFontSize(
+                text = state.expression.ifEmpty { "0" },
+                maxWidth = maxWidth,
+                maxHeight = maxHeight,
+                min = 17.sp,
+                max = 30.sp,
+                maxLines = 1,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Medium
+            )
             if (state.expression.isEmpty()) {
                 Text(
                     text = "0",
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 28.sp
+                        fontSize = expressionSize
                     ),
                     color = colors.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier
@@ -165,7 +177,7 @@ fun DisplayPanel(
                 readOnly = true,
                 textStyle = MaterialTheme.typography.headlineLarge.copy(
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 28.sp,
+                    fontSize = expressionSize,
                     fontWeight = FontWeight.Medium,
                     color = colors.onSurface
                 ),
@@ -194,16 +206,14 @@ fun DisplayPanel(
         // --- live preview ----------------------------------------------------
         val preview = state.preview
         if (preview != null && state.error == null) {
-            Text(
+            AutoSizeText(
                 text = "= $preview",
-                style = MaterialTheme.typography.titleMedium.copy(
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 16.sp
-                ),
+                minSize = 11.sp,
+                maxSize = 16.sp,
                 color = colors.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                fontFamily = FontFamily.Monospace,
                 textAlign = TextAlign.End,
+                maxLines = 1,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 2.dp)
@@ -229,6 +239,10 @@ fun DisplayPanel(
             }
         }
 
+        // Anything the readout does not need stays between the expression and
+        // the answer, so the answer keeps to the bottom of the card.
+        Spacer(modifier = Modifier.weight(1f))
+
         // --- result ----------------------------------------------------------
         Row(
             modifier = Modifier
@@ -238,17 +252,17 @@ fun DisplayPanel(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 if (state.resultText.isNotEmpty()) {
-                    Text(
+                    // The answer is the one thing that should never be cut
+                    // off: it starts big and gives up size, not digits.
+                    AutoSizeText(
                         text = state.resultText,
-                        style = MaterialTheme.typography.displaySmall.copy(
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
+                        minSize = 20.sp,
+                        maxSize = 46.sp,
                         color = colors.primary,
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.End,
+                        maxLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
                     state.fractionHint?.let { hint ->

@@ -206,4 +206,11 @@ object Keypads {
         KeypadPage.CONST -> constPage
         KeypadPage.MATRIX -> matrixPage
     }
+
+    /**
+     * Rows in the busiest page. The keypad is always laid out for this many
+     * rows, so that a page with fewer keys (Const, Matrix) does not change the
+     * size of the keypad — or of the readout above it.
+     */
+    val maxRows: Int = KeypadPage.entries.maxOf { keysFor(it).size }
 }
