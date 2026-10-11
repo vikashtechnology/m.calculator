@@ -99,6 +99,15 @@ changes — as soon as these exist:
 
 Without them the workflow simply prints what is missing and does nothing.
 
+## Look at the dashboard without deploying
+
+```bash
+python3 admin/worker/preview.py       # http://localhost:8080
+```
+
+Serves the real dashboard page (straight from `worker.js`) with sample numbers,
+so you can see exactly what deploys before signing up to anything.
+
 ## Local experiments
 
 ```bash
