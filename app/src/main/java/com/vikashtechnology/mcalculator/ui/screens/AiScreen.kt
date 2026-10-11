@@ -171,7 +171,7 @@ fun AiScreen(
         source.requestFocus()
     }
 
-    val chromeClient = remember {
+    val webChrome = remember {
         object : WebChromeClient() {
             override fun onCreateWindow(
                 view: WebView,
@@ -205,7 +205,7 @@ fun AiScreen(
         }
     }
 
-    val webViewClient = remember {
+    val webClient = remember {
         object : WebViewClientCompat() {
             override fun shouldInterceptRequest(
                 view: WebView,
@@ -327,8 +327,8 @@ fun AiScreen(
                         settings.allowContentAccess = false
                         settings.loadsImagesAutomatically = true
                         settings.mediaPlaybackRequiresUserGesture = true
-                        webViewClient = webViewClient
-                        webChromeClient = chromeClient
+                        webViewClient = webClient
+                        webChromeClient = webChrome
                         addJavascriptInterface(
                             object {
                                 @JavascriptInterface
