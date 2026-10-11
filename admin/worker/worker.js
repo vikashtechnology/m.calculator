@@ -38,7 +38,7 @@ export default {
       });
     }
     if (url.pathname === "/health") {
-      return json({ ok: true });
+      return handleHealth(env);
     }
     return json({ error: "not found" }, 404);
   },
@@ -316,6 +316,37 @@ async function handleSolve(request, env) {
   }
 
   return json({ answer, by: user ? user.email ?? user.sub ?? "" : "" });
+}
+
+/**
+ * A setup checklist you can open in a browser: says whether the database is
+ * reachable and which secrets are configured, without revealing any of them.
+ */
+async function handleHealth(env) {
+  let database = "ok";
+  try {
+    await env.DB.prepare("SELECT COUNT(*) AS n FROM installs").first();
+  } catch (error) {
+    database = "error: " + String(error);
+  }
+  const body = {
+    ok: database === "ok",
+    service: "AI Calculator stats",
+    database,
+    secrets: {
+      ADMIN_TOKEN: Boolean(env.ADMIN_TOKEN),
+      GEMINI_API_KEY: Boolean(env.GEMINI_API_KEY),
+      GOOGLE_WEB_CLIENT_ID: Boolean(env.GOOGLE_WEB_CLIENT_ID),
+    },
+    endpoints: {
+      dashboard: "GET /",
+      stats: "GET /v1/stats?days=30&token=…",
+      events: "POST /v1/events",
+      solve: "POST /v1/solve  (optional; the app uses the user's own key)",
+    },
+    note: "The dashboard needs ADMIN_TOKEN. /v1/events is what the app posts to.",
+  };
+  return json(body, database === "ok" ? 200 : 503);
 }
 
 async function handleStats(request, env, url) {

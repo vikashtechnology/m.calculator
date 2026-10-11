@@ -15,7 +15,7 @@ database_id = "REPLACE_WITH_THE_ID_FROM_WRANGLER"
 #   npx wrangler secret put ADMIN_TOKEN
 #
 # [vars]
-# ADMIN_TOKEN = "only for local experiments: wrangler dev"
+# ADMIN_TOKEN = "localdev"   # then: wrangler dev --local
 
 [observability]
 enabled = true

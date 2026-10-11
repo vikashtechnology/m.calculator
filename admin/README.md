@@ -1,16 +1,12 @@
-# Usage dashboard and Ask AI backend
+# Admin panel: the usage dashboard
 
-One Worker does two jobs:
+A read-only dashboard for AI Calculator: installs, active users, and calculations
+and AI questions per day, with a per-day table and a chart.
 
-1. a read-only dashboard for AI Calculator: installs, active users, and
-   calculations and AI questions per day;
-2. **optionally, the Ask AI backend**: it holds the Gemini key and answers
-   questions for signed-in users, so the key never ships inside the APK.
-
-> Ask AI uses a key the *user* pastes into the app (see the README), so the app
-> never calls this endpoint. The solver below is kept for anyone who would rather
-> hold the key server-side; leave the two AI secrets unset and the Worker is just
-> a dashboard.
+The Worker also ships an **optional** `/v1/solve` endpoint that holds the Gemini
+key server-side and checks a Google sign-in — the app does not call it (Ask AI
+runs on the key the *user* pastes in), so leave those two secrets unset and the
+Worker is purely the dashboard.
 
 It runs entirely on Cloudflare — one Worker plus one D1 (SQLite) database, both
 free-tier friendly, no other service to sign up for.
@@ -35,44 +31,96 @@ Nothing is sent while the switch in the app's drop-down menu
 (*Anonymous usage stats*) is off, and turning it off also drops whatever was
 still waiting to be uploaded.
 
-## Deploy it (about five minutes)
+## Set it up — one command
 
 ```bash
 cd admin/worker
-npx wrangler login                                        # once per machine
-npx wrangler d1 create m_calculator_stats                 # prints a database_id
+./setup.sh
+```
+
+That script logs you in to Cloudflare (a browser opens once), creates the D1
+database, writes its id into `wrangler.toml`, applies `schema.sql`, asks for the
+dashboard password, deploys the Worker, and prints the URL plus a `/health`
+check. It is safe to re-run.
+
+<details>
+<summary>What it does, step by step (doing it by hand)</summary>
+
+```bash
+cd admin/worker
+npx wrangler login                                          # once per machine
+npx wrangler d1 create m_calculator_stats                   # prints database_id
 #   → paste that id into wrangler.toml
 npx wrangler d1 execute m_calculator_stats --remote --file=schema.sql
-npx wrangler secret put ADMIN_TOKEN                       # pick a long password
-
-# Optional, but this is the "letting users sign in with Google" part:
-npx wrangler secret put GEMINI_API_KEY                    # aistudio.google.com key
-npx wrangler secret put GOOGLE_WEB_CLIENT_ID              # the *Web* OAuth client ID
+npx wrangler secret put ADMIN_TOKEN                         # the dashboard password
 npx wrangler deploy
 ```
 
-`wrangler deploy` prints the worker URL, e.g.
-`https://m-calculator-stats.<your-name>.workers.dev`. Open it in a browser, paste
-the admin token and the dashboard appears.
+Optional, only for the server-side solver (the app does not call it — Ask AI
+runs on the user's own key):
 
-Point the app at the same URL, either
+```bash
+npx wrangler secret put GEMINI_API_KEY                      # aistudio.google.com key
+npx wrangler secret put GOOGLE_WEB_CLIENT_ID                # the *Web* OAuth client ID
+```
+</details>
 
-* add a repository secret `TELEMETRY_URL` with that URL (CI passes it as
-  `-PtelemetryUrl=…`), or
-* put `telemetryUrl=https://…` in `gradle.properties` (or pass
-  `-PtelemetryUrl=https://…` on the command line).
+## After deploying
 
-Builds without it simply never report anything.
+Open `https://<your-worker>.workers.dev/health` — it is a setup checklist that
+never reveals a secret:
+
+```json
+{ "ok": true, "database": "ok",
+  "secrets": { "ADMIN_TOKEN": true, "GEMINI_API_KEY": false, "GOOGLE_WEB_CLIENT_ID": false } }
+```
+
+Then switch on the app's counters with one GitHub secret
+(Settings → Secrets and variables → Actions → New repository secret):
+
+| Name | Value |
+| --- | --- |
+| `TELEMETRY_URL` | the worker URL, e.g. `https://m-calculator-stats.you.workers.dev` |
+
+Push any commit (or re-run the Android CI workflow) and the next APK reports
+counts. Until then the app keeps every counter on the phone.
+
+## Keep it deployed automatically (optional)
+
+`.github/workflows/worker.yml` redeploys the Worker whenever `admin/worker`
+changes — as soon as these exist:
+
+| Kind | Name | Where it comes from |
+| --- | --- | --- |
+| secret | `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → *Edit Cloudflare Workers* |
+| secret | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers → Account ID |
+| secret | `ADMIN_TOKEN` | the password you chose in `setup.sh` |
+| variable | `D1_DATABASE_ID` | the id `setup.sh` wrote into `wrangler.toml` |
+
+Without them the workflow simply prints what is missing and does nothing.
 
 ## Local experiments
 
 ```bash
 npx wrangler d1 execute m_calculator_stats --local --file=schema.sql
-npx wrangler dev                     # http://127.0.0.1:8787
+npx wrangler dev --local      # http://127.0.0.1:8787, ADMIN_TOKEN from a [vars] entry
 curl -X POST http://127.0.0.1:8787/v1/events \
   -H 'content-type: application/json' \
   -d '{"id":"testinstall1234","day":"2026-10-11","v":"1.0.0","sdk":34,"events":{"calc":12,"app_open":2}}'
+curl -s 'http://127.0.0.1:8787/health'
+curl -s 'http://127.0.0.1:8787/v1/stats?days=7&token=localdev'
 ```
+
+## Tests
+
+```bash
+./tools/run_worker_tests.sh      # from the repository root
+```
+
+Runs the Worker against a stub D1 — health, event ingest (including the
+whitelist), the stats token check, the dashboard page and the solver's
+missing-secret path. No Cloudflare account needed. The Android CI workflow runs
+the same script on every push.
 
 ## API
 

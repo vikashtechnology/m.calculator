@@ -142,9 +142,17 @@ Optional build properties:
 ### Usage dashboard (optional)
 `admin/worker` holds a Cloudflare Worker that serves a small read-only dashboard:
 installs, active users (today / week / range) and calculations and AI questions
-per day, with a per-day table and chart. It needs one D1 database, no other
-service, and the whole deploy is five `wrangler` commands — see
-[`admin/README.md`](admin/README.md).
+per day, with a per-day table and chart. One D1 database, no other service, and
+the whole setup is one command:
+
+```bash
+cd admin/worker && ./setup.sh        # creates the database, deploys, prints the URL
+```
+
+Then add the printed URL as the repository secret `TELEMETRY_URL` and the next
+build reports counts. `…/health` lists what is configured; see
+[`admin/README.md`](admin/README.md) for the details and the optional
+auto-deploy workflow.
 
 The app sends only aggregate counts (app opens, calculations, AI questions) with
 a random per-install id: no expressions, results, files or accounts. The switch
