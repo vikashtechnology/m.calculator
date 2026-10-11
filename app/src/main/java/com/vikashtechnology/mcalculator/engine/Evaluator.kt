@@ -3,15 +3,26 @@ package com.vikashtechnology.mcalculator.engine
 /** Everything the evaluator needs to know about the outside world. */
 class MathContext(
     var angleMode: AngleMode = AngleMode.DEG,
-    /** User variables (`A`–`F`, `x`, `n`, ...). Keys are stored lower-case. */
-    val variables: MutableMap<String, Double> = LinkedHashMap(),
-    var ans: Double = 0.0
+    /**
+     * User variables (`A`–`F`, `x`, `n`, …). Keys are stored lower-case and the
+     * values are full engine values, so a variable can hold a matrix too.
+     */
+    val variables: MutableMap<String, Value> = LinkedHashMap(),
+    var ans: Value = Num.ZERO,
+    /** When true the display renders complex results in polar form. */
+    var polarMode: Boolean = false
 ) {
-    fun variable(name: String): Double? = variables[name.lowercase()]
+    fun valueOf(name: String): Value? = variables[name.lowercase()]
+
     fun setVariable(name: String, value: Double) {
+        variables[name.lowercase()] = Num(value)
+    }
+
+    fun setValue(name: String, value: Value) {
         variables[name.lowercase()] = value
     }
-    fun copy(): MathContext = MathContext(angleMode, LinkedHashMap(variables), ans)
+
+    fun copy(): MathContext = MathContext(angleMode, LinkedHashMap(variables), ans, polarMode)
 }
 
 /** Result of evaluating an expression. */
@@ -57,9 +68,9 @@ object Evaluator {
     private fun lookup(ref: VarRef, ctx: MathContext): Value {
         val name = ref.name.lowercase()
         constants[name]?.let { return Num(it) }
-        if (name == "ans") return Num(ctx.ans)
+        if (name == "ans") return ctx.ans
         if (name == "i" || name == "j") return Num.I
-        ctx.variable(name)?.let { return Num(it) }
+        ctx.valueOf(name)?.let { return it }
         if (name.length == 1) return Num.ZERO // A–F style variable slots start at zero
         throw MathError("Unknown variable '${ref.name}'", ref.pos)
     }

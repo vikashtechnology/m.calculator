@@ -171,12 +171,13 @@ object Calculus {
     }
 
     private fun value(expr: Expr, variable: String, x: Double, ctx: MathContext): Double {
-        val previous = ctx.variables[variable]
-        ctx.variables[variable] = x
+        val previous = ctx.valueOf(variable)
+        ctx.setVariable(variable, x)
         try {
             return Evaluator.realOrNull(Evaluator.eval(expr, ctx), "Expression")
         } finally {
-            if (previous == null) ctx.variables.remove(variable) else ctx.variables[variable] = previous
+            if (previous == null) ctx.variables.remove(variable.lowercase())
+            else ctx.setValue(variable, previous)
         }
     }
 

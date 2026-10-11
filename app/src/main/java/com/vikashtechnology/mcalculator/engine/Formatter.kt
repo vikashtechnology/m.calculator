@@ -47,7 +47,7 @@ object Formatter {
     }
 
     fun value(v: Value, polarAngleMode: AngleMode? = null): String = when (v) {
-        is Num -> if (v.isRealScalar) {
+        is Num -> if (v.isRealScalar || isNegligible(v.im, v.re)) {
             number(v.re)
         } else {
             complex(v, polarAngleMode)
@@ -55,16 +55,25 @@ object Formatter {
         is Mat -> v.displayString()
     }
 
+    /**
+     * True when [part] is only floating point dust next to [other], e.g. the
+     * 1.2e-16 real part that shows up when expanding (1+i)².
+     */
+    private fun isNegligible(part: Double, other: Double): Boolean =
+        Math.abs(part) <= 1e-13 * Math.max(1.0, Math.abs(other))
+
     private fun complex(v: Num, polarAngleMode: AngleMode?): String {
         if (polarAngleMode != null) {
             val angle = polarAngleMode.fromRadians(v.arg)
             return "${number(v.abs)} ∠ ${number(angle)}°"
         }
-        val re = number(v.re)
-        val imAbs = number(Math.abs(v.im))
+        val realPart = if (isNegligible(v.re, v.im)) 0.0 else v.re
+        val imagPart = if (isNegligible(v.im, v.re)) 0.0 else v.im
+        val re = number(realPart)
+        val imAbs = number(Math.abs(imagPart))
         return when {
-            v.re == 0.0 -> if (v.im < 0) "-${imAbs}i" else "${imAbs}i"
-            v.im < 0 -> "$re - ${imAbs}i"
+            realPart == 0.0 -> if (imagPart < 0) "-${imAbs}i" else "${imAbs}i"
+            imagPart < 0 -> "$re - ${imAbs}i"
             else -> "$re + ${imAbs}i"
         }
     }
@@ -77,14 +86,13 @@ object Formatter {
         if (x.isNaN() || x.isInfinite()) return null
         if (Math.abs(x) >= 1e6) return null
         if (Math.rint(x) == x) return null
+        // Already a clean decimal (2.5, 0.375): a fraction hint adds no value.
+        if (BigDecimal(x).stripTrailingZeros().scale() <= 6) return null
 
         val tolerance = Math.abs(x) * 1e-11 + 1e-13
-        // Continued fraction expansion (Stern–Brocot style convergents).
-        var lowerN = 0L; var lowerD = 1L
-        var upperN = 1L; var upperD = 0L
         val negative = x < 0
         val target = Math.abs(x)
-        // Simple rational search up to maxDenominator.
+        // Search the best rational approximation up to maxDenominator.
         var bestN = 0L
         var bestD = 1L
         var bestError = Double.MAX_VALUE

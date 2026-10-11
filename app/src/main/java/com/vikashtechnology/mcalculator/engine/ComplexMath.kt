@@ -20,7 +20,6 @@ object ComplexMath {
 
     fun div(a: Num, b: Num): Num {
         if (b.re == 0.0 && b.im == 0.0) throw MathError("Division by zero")
-        val d = b.re * b.re + b.im * b.im
         if (Math.abs(b.re) >= Math.abs(b.im)) {
             val r = b.im / b.re
             val den = b.re + b.im * r
@@ -29,7 +28,7 @@ object ComplexMath {
         val r = b.re / b.im
         val den = b.re * r + b.im
         return Num((a.re * r + a.im) / den, (a.im * r - a.re) / den)
-        // Note: `d` kept for clarity of the classic formula; the scaled version above avoids overflow.
+        // The scaled form above avoids overflow when one part dominates.
     }
 
     fun neg(a: Num): Num = Num(-a.re, -a.im)

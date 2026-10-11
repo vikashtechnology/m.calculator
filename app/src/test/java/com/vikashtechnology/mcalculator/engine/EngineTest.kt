@@ -159,7 +159,9 @@ class EngineTest {
         check("(1+i)*(1-i)", "2")
         check("ln(-1)", "3.14159265359i")
         check("arg(1+i)", "45")
-        check("asin(2)", "90 - 75.4561292902i")
+        // Complex results stay in radians: the angle mode only applies to real arguments.
+        check("asin(2)", "1.57079632679 - 1.31695789692i")
+        check("sin(1+i)", "1.29845758142 + 0.634963914785i")
     }
 
     @Test
@@ -203,10 +205,36 @@ class EngineTest {
     @Test
     fun fractionHints() {
         assertEquals("1/3", Formatter.fractionHint(1.0 / 3.0))
-        assertEquals("3/8", Formatter.fractionHint(0.375))
+        assertEquals("1/6", Formatter.fractionHint(1.0 / 6.0))
         assertEquals("1/7", Formatter.fractionHint(1.0 / 7.0))
+        assertEquals("22/7", Formatter.fractionHint(22.0 / 7.0))
+
+        // Clean decimals and irrational-looking numbers get no hint.
+        assertEquals(null, Formatter.fractionHint(0.375))
         assertEquals(null, Formatter.fractionHint(2.5))
         assertEquals(null, Formatter.fractionHint(1.23456789))
+    }
+
+    @Test
+    fun numberFormattingEdgeCases() {
+        assertEquals("0", Formatter.number(0.0))
+        assertEquals("0", Formatter.number(-0.0))
+        assertEquals("-42", Formatter.number(-42.0))
+        assertEquals("1e-12", Formatter.number(1e-12))
+        assertEquals("1e16", Formatter.number(1e16))
+        assertEquals("2.5e-5", Formatter.number(2.5e-5))
+        assertEquals("Infinity", Formatter.number(Double.POSITIVE_INFINITY).replace("∞", "Infinity"))
+        assertEquals("123456789012", Formatter.number(123456789012.0))
+        // Rounding must not produce a trailing ".0".
+        assertEquals("3", Formatter.number(3.0))
+    }
+
+    @Test
+    fun matrixLiteralErrorsAreHelpful() {
+        assertTrue(eval("[1,2;3]").startsWith("ERROR: All matrix rows must have the same length"))
+        assertTrue(eval("[1,2] + [1,2;3,4]").startsWith("ERROR:"))
+        assertTrue(eval("inv([1,2;2,4])").startsWith("ERROR: Matrix is singular"))
+        assertTrue(eval("[1,2;3,4] * [1,2,3]").startsWith("ERROR: Cannot multiply"))
     }
 
     @Test

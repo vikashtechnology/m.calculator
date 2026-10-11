@@ -90,6 +90,11 @@ jobs:
             echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Commit: $GITHUB_SHA"
             echo
+            echo '## Errors'
+            echo '```'
+            grep -h -E "^(e|w): |error: |What went wrong|Execution failed for task|FAILURE: Build|Caused by: [a-z]|\* Try|\* What went wrong|AAPT" ci-logs/*.log 2>/dev/null | head -c 30000
+            echo '```'
+            echo
             echo '## Failing tests'
             echo '```'
             grep -h -E "<testcase|<failure|<error" app/build/test-results/testDebugUnitTest/*.xml 2>/dev/null | head -c 20000

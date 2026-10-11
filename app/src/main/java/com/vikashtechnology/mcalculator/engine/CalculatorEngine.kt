@@ -10,7 +10,7 @@ object CalculatorEngine {
         if (input.isBlank()) return EngineResult.Err("Nothing to calculate")
         return try {
             val value = valueOf(input, ctx)
-            EngineResult.Ok(value, Formatter.value(value, polarMode(ctx)))
+            EngineResult.Ok(value, Formatter.value(value, if (ctx.polarMode) ctx.angleMode else null))
         } catch (e: MathError) {
             EngineResult.Err(e.message ?: "Math error", e.position)
         } catch (e: StackOverflowError) {
@@ -19,9 +19,6 @@ object CalculatorEngine {
             EngineResult.Err(e.message ?: "Could not calculate this expression")
         }
     }
-
-    private fun polarMode(ctx: MathContext): AngleMode? =
-        if (ctx.variables["__polar__"] == 1.0) ctx.angleMode else null
 
     /** Evaluates and returns the raw value, letting [MathError] escape. */
     fun valueOf(input: String, ctx: MathContext): Value {
@@ -34,13 +31,14 @@ object CalculatorEngine {
     /** Evaluates with a variable temporarily bound (used by calculus and plotting). */
     fun valueWith(input: String, parsed: Expr?, variable: String, value: Double, ctx: MathContext): Double {
         val expr = parsed ?: parse(input)
-        val previous = ctx.variables[variable]
-        ctx.variables[variable] = value
+        val previous = ctx.valueOf(variable)
+        ctx.setVariable(variable, value)
         try {
             val result = Evaluator.eval(expr, ctx)
             return Evaluator.realOrNull(result, "Expression")
         } finally {
-            if (previous == null) ctx.variables.remove(variable) else ctx.variables[variable] = previous
+            if (previous == null) ctx.variables.remove(variable.lowercase())
+            else ctx.setValue(variable, previous)
         }
     }
 }
