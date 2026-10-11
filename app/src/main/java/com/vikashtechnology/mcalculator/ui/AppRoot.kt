@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Cake
@@ -41,9 +43,7 @@ import androidx.compose.material.icons.filled.Numbers
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Percent
 import androidx.compose.material.icons.filled.Receipt
-import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -79,7 +79,7 @@ import kotlinx.coroutines.launch
 
 enum class AppTab(val label: String, val icon: ImageVector) {
     CALC("Calc", Icons.Filled.Calculate),
-    GRAPH("Graph", Icons.Filled.ShowChart),
+    GRAPH("Graph", Icons.AutoMirrored.Filled.ShowChart),
     SOLVE("Solve", Icons.Filled.Functions),
     MATRIX("Matrix", Icons.Filled.GridOn),
     UNITS("Units", Icons.Filled.SwapHoriz),
@@ -421,7 +421,7 @@ private fun toolIcon(tool: EverydayTool): ImageVector = when (tool) {
     EverydayTool.EMI -> Icons.Filled.Home
     EverydayTool.BMI -> Icons.Filled.Favorite
     EverydayTool.PERCENT -> Icons.Filled.Percent
-    EverydayTool.INTEREST -> Icons.Filled.TrendingUp
+    EverydayTool.INTEREST -> Icons.AutoMirrored.Filled.TrendingUp
     EverydayTool.PROFIT -> Icons.Filled.Payments
     EverydayTool.ALGEBRA -> Icons.Filled.Functions
     EverydayTool.BASES -> Icons.Filled.Numbers

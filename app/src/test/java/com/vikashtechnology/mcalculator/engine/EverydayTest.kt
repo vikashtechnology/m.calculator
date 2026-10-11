@@ -78,7 +78,7 @@ class EverydayTest {
     @Test
     fun bmiCategories() {
         val healthy = Everyday.bmi(70.0, 175.0)
-        assertEquals("22.857143", Formatter.number(healthy.bmi))
+        assertEquals("22.8571428571", Formatter.number(healthy.bmi))
         assertEquals("Normal weight", healthy.category)
         assertEquals(56.66, r(healthy.healthyMinKg, 2), 0.01)
         assertEquals(76.26, r(healthy.healthyMaxKg, 2), 0.01)
@@ -91,7 +91,7 @@ class EverydayTest {
     fun simpleAndCompoundInterest() {
         val result = Everyday.interest(10_000.0, 10.0, 2.0, 1)
         assertEquals(2000.0, result.simpleInterest, 1e-9)
-        assertEquals(11_000.0, result.simpleTotal, 1e-9)
+        assertEquals(12_000.0, result.simpleTotal, 1e-9)
         assertEquals(2100.0, result.compoundInterest, 1e-9)
         assertEquals(12_100.0, result.compoundTotal, 1e-9)
 
