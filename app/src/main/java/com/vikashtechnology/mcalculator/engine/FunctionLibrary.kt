@@ -1,8 +1,13 @@
 package com.vikashtechnology.mcalculator.engine
 
 /**
- * The built-in function library. Names are matched lower-case and every entry
- * validates its own argument count and types so errors read well on screen.
+ * The built-in function library.
+ *
+ * Names are matched lower-case and every entry validates its own argument count
+ * and types, so mistakes read as friendly messages on the calculator display.
+ *
+ * Convention: [ComplexMath] functions already return [Num], [Factorials] and the
+ * aggregation helpers return plain `Double`, so only the latter need wrapping.
  */
 object FunctionLibrary {
 
@@ -17,7 +22,7 @@ object FunctionLibrary {
     /** Exactly one argument, as a real number. */
     private fun real1(args: List<Value>, name: String): Double = realOf(num1(args, name), name)
 
-    /** Exactly one argument, as any value (used by matrix/aggregate functions). */
+    /** Exactly one argument, as any value (used by matrix and aggregate functions). */
     private fun any1(args: List<Value>, name: String): Value {
         expectCount(args, 1, name)
         return args[0]
@@ -33,14 +38,19 @@ object FunctionLibrary {
         if (value.isRealScalar) value.re else throw MathError("$name expects a real number")
 
     private fun realAt(args: List<Value>, index: Int, name: String): Double {
-        val value = args[index]
-        val num = value as? Num ?: throw MathError("$name expects numbers")
+        val num = args[index] as? Num ?: throw MathError("$name expects numbers")
         return realOf(num, name)
     }
+
+    private fun numAt(args: List<Value>, index: Int, name: String): Num =
+        args[index] as? Num ?: throw MathError("$name expects numbers")
 
     private fun matrix1(args: List<Value>, name: String): Mat =
         any1(args, name) as? Mat
             ?: throw MathError("$name expects a matrix such as [1, 2; 3, 4]")
+
+    private fun matrixAt(args: List<Value>, index: Int, name: String): Mat =
+        args[index] as? Mat ?: throw MathError("$name expects a matrix")
 
     /** Flattens numeric arguments and vectors into one list of reals. */
     private fun reals(args: List<Value>, name: String): List<Double> {
@@ -58,7 +68,7 @@ object FunctionLibrary {
         return out
     }
 
-    // ---- dispatch ----------------------------------------------------------
+    // ---- entry point -------------------------------------------------------
 
     fun call(name: String, args: List<Value>, ctx: MathContext, pos: Int): Value {
         return try {
@@ -72,30 +82,30 @@ object FunctionLibrary {
     private fun dispatch(name: String, args: List<Value>, ctx: MathContext): Value = when (name) {
 
         // --- trigonometry (angle mode aware) --------------------------------
-        "sin" -> Num(outAngle(ComplexMath.sin(intoAngle(num1(args, name), ctx), ctx), ctx))
-        "cos" -> Num(outAngle(ComplexMath.cos(intoAngle(num1(args, name), ctx), ctx), ctx))
-        "tan" -> Num(outAngle(ComplexMath.tan(intoAngle(num1(args, name), ctx), ctx), ctx))
-        "csc" -> Num(outAngle(reciprocal(ComplexMath.sin(intoAngle(num1(args, name), ctx), ctx)), ctx))
-        "sec" -> Num(outAngle(reciprocal(ComplexMath.cos(intoAngle(num1(args, name), ctx), ctx)), ctx))
-        "cot" -> Num(outAngle(reciprocal(ComplexMath.tan(intoAngle(num1(args, name), ctx), ctx)), ctx))
+        "sin" -> outAngle(ComplexMath.sin(intoAngle(num1(args, name), ctx)), ctx)
+        "cos" -> outAngle(ComplexMath.cos(intoAngle(num1(args, name), ctx)), ctx)
+        "tan" -> outAngle(ComplexMath.tan(intoAngle(num1(args, name), ctx)), ctx)
+        "csc" -> outAngle(reciprocal(ComplexMath.sin(intoAngle(num1(args, name), ctx))), ctx)
+        "sec" -> outAngle(reciprocal(ComplexMath.cos(intoAngle(num1(args, name), ctx))), ctx)
+        "cot" -> outAngle(reciprocal(ComplexMath.tan(intoAngle(num1(args, name), ctx))), ctx)
 
-        "asin", "arcsin" -> Num(fromAngle(ComplexMath.asin(num1(args, name)), ctx))
-        "acos", "arccos" -> Num(fromAngle(ComplexMath.acos(num1(args, name)), ctx))
-        "atan", "arctan" -> Num(fromAngle(ComplexMath.atan(num1(args, name)), ctx))
-        "asec" -> Num(fromAngle(ComplexMath.acos(reciprocal(num1(args, name))), ctx))
-        "acsc" -> Num(fromAngle(ComplexMath.asin(reciprocal(num1(args, name))), ctx))
-        "acot" -> Num(fromAngle(ComplexMath.atan(reciprocal(num1(args, name))), ctx))
+        "asin", "arcsin" -> fromAngle(ComplexMath.asin(num1(args, name)), ctx)
+        "acos", "arccos" -> fromAngle(ComplexMath.acos(num1(args, name)), ctx)
+        "atan", "arctan" -> fromAngle(ComplexMath.atan(num1(args, name)), ctx)
+        "asec" -> fromAngle(ComplexMath.acos(reciprocal(num1(args, name))), ctx)
+        "acsc" -> fromAngle(ComplexMath.asin(reciprocal(num1(args, name))), ctx)
+        "acot" -> fromAngle(ComplexMath.atan(reciprocal(num1(args, name))), ctx)
 
-        "sinh" -> Num(outAngle(ComplexMath.sinh(num1(args, name)), ctx))
-        "cosh" -> Num(outAngle(ComplexMath.cosh(num1(args, name)), ctx))
-        "tanh" -> Num(outAngle(ComplexMath.tanh(num1(args, name)), ctx))
-        "csch" -> Num(outAngle(reciprocal(ComplexMath.sinh(num1(args, name))), ctx))
-        "sech" -> Num(outAngle(reciprocal(ComplexMath.cosh(num1(args, name))), ctx))
-        "coth" -> Num(outAngle(reciprocal(ComplexMath.tanh(num1(args, name))), ctx))
+        "sinh" -> outAngle(ComplexMath.sinh(num1(args, name)), ctx)
+        "cosh" -> outAngle(ComplexMath.cosh(num1(args, name)), ctx)
+        "tanh" -> outAngle(ComplexMath.tanh(num1(args, name)), ctx)
+        "csch" -> outAngle(reciprocal(ComplexMath.sinh(num1(args, name))), ctx)
+        "sech" -> outAngle(reciprocal(ComplexMath.cosh(num1(args, name))), ctx)
+        "coth" -> outAngle(reciprocal(ComplexMath.tanh(num1(args, name))), ctx)
 
-        "asinh" -> Num(ComplexMath.asinh(num1(args, name)))
-        "acosh" -> Num(ComplexMath.acosh(num1(args, name)))
-        "atanh" -> Num(ComplexMath.atanh(num1(args, name)))
+        "asinh" -> ComplexMath.asinh(num1(args, name))
+        "acosh" -> ComplexMath.acosh(num1(args, name))
+        "atanh" -> ComplexMath.atanh(num1(args, name))
 
         "atan2" -> {
             expectCount(args, 2, name)
@@ -104,57 +114,52 @@ object FunctionLibrary {
             Num(ctx.angleMode.fromRadians(Math.atan2(y, x)))
         }
 
-        // --- exponentials and logarithms ------------------------------------
-        "exp" -> Num(ComplexMath.exp(num1(args, name)))
-        "exp2" -> Num(ComplexMath.pow(Num.TWO, num1(args, name)))
-        "exp10" -> Num(ComplexMath.pow(Num(10.0), num1(args, name)))
-        "ln" -> Num(ComplexMath.log(nonZero(num1(args, name), name)))
+        // --- exponentials and logarithms -------------------------------------
+        "exp" -> ComplexMath.exp(num1(args, name))
+        "exp2" -> ComplexMath.pow(Num.TWO, num1(args, name))
+        "exp10" -> ComplexMath.pow(Num(10.0), num1(args, name))
+        "ln" -> ComplexMath.log(nonZero(num1(args, name), name))
         "log" -> when (args.size) {
-            1 -> Num(ComplexMath.log10(nonZero(num1(args, name), name)))
-            2 -> {
-                val value = nonZero(args[0] as? Num ?: throw MathError("log expects numbers"), name)
-                val base = nonZero(args[1] as? Num ?: throw MathError("log expects numbers"), name)
-                Num(ComplexMath.div(ComplexMath.log(value), ComplexMath.log(base)))
-            }
+            1 -> ComplexMath.log10(nonZero(num1(args, name), name))
+            2 -> ComplexMath.div(
+                ComplexMath.log(nonZero(numAt(args, 0, name), name)),
+                ComplexMath.log(nonZero(numAt(args, 1, name), name))
+            )
             else -> throw MathError("log expects 1 or 2 arguments")
         }
-        "log2" -> Num(
-            ComplexMath.div(
-                ComplexMath.log(nonZero(num1(args, name), name)),
-                Num(Math.log(2.0))
-            )
+        "log2" -> ComplexMath.div(
+            ComplexMath.log(nonZero(num1(args, name), name)),
+            Num(Math.log(2.0))
         )
-        "log10" -> Num(ComplexMath.log10(nonZero(num1(args, name), name)))
+        "log10" -> ComplexMath.log10(nonZero(num1(args, name), name))
 
-        // --- powers and roots -----------------------------------------------
-        "sqrt" -> Num(ComplexMath.sqrt(num1(args, name)))
+        // --- powers and roots -------------------------------------------------
+        "sqrt" -> ComplexMath.sqrt(num1(args, name))
         "cbrt" -> {
             val v = num1(args, name)
-            Num(if (v.isRealScalar) Num(Math.cbrt(v.re)) else ComplexMath.pow(v, Num(1.0 / 3.0)))
+            if (v.isRealScalar) Num(Math.cbrt(v.re)) else ComplexMath.pow(v, Num(1.0 / 3.0))
         }
         "nthroot", "root" -> {
             expectCount(args, 2, name)
-            val x = args[0] as? Num ?: throw MathError("$name expects numbers")
+            val x = numAt(args, 0, name)
             val n = realAt(args, 1, name)
             if (n == 0.0) throw MathError("Root of degree zero is undefined")
-            Num(
-                if (x.im == 0.0 && x.re < 0 && Math.rint(n) == n && n % 2.0 != 0.0) {
-                    Num(-Math.pow(-x.re, 1.0 / n))
-                } else {
-                    ComplexMath.pow(x, Num(1.0 / n))
-                }
-            )
+            if (x.im == 0.0 && x.re < 0 && Math.rint(n) == n && n % 2.0 != 0.0) {
+                Num(-Math.pow(-x.re, 1.0 / n))
+            } else {
+                ComplexMath.pow(x, Num(1.0 / n))
+            }
         }
         "pow" -> {
             expectCount(args, 2, name)
-            Num(ComplexMath.pow(num1(listOf(args[0]), name), num1(listOf(args[1]), name)))
+            ComplexMath.pow(numAt(args, 0, name), numAt(args, 1, name))
         }
         "hypot", "hyp" -> {
             val values = reals(args, name)
             Num(Math.sqrt(values.sumOf { it * it }))
         }
 
-        // --- rounding and sign ----------------------------------------------
+        // --- rounding and sign ------------------------------------------------
         "abs" -> when (val v = any1(args, name)) {
             is Num -> Num(v.abs)
             is Mat -> Num(MatrixMath.frobeniusNorm(v))
@@ -170,7 +175,7 @@ object FunctionLibrary {
             else -> throw MathError("round expects 1 or 2 arguments")
         }
 
-        // --- combinatorics and number theory --------------------------------
+        // --- combinatorics and number theory ----------------------------------
         "fact", "factorial" -> Num(Factorials.factorial(real1(args, name)))
         "gamma" -> Num(Factorials.gamma(real1(args, name)))
         "lgamma", "loggamma" -> Num(Factorials.logGamma(real1(args, name)))
@@ -192,7 +197,7 @@ object FunctionLibrary {
             Num(a - b * Math.floor(a / b))
         }
 
-        // --- aggregates ------------------------------------------------------
+        // --- aggregates --------------------------------------------------------
         "min" -> Num(reals(args, name).min())
         "max" -> Num(reals(args, name).max())
         "sum" -> Num(reals(args, name).sum())
@@ -203,21 +208,21 @@ object FunctionLibrary {
         "variance", "var" -> Num(variance(reals(args, name)))
         "count" -> Num(reals(args, name).size.toDouble())
 
-        // --- angle conversion -------------------------------------------------
+        // --- angle conversion ---------------------------------------------------
         "deg" -> Num(Math.toDegrees(real1(args, name)))
         "rad" -> Num(Math.toRadians(real1(args, name)))
 
-        // --- complex helpers --------------------------------------------------
+        // --- complex helpers -----------------------------------------------------
         "re" -> Num(num1(args, name).re)
         "im" -> Num(num1(args, name).im)
-        "conj", "conjugate" -> Num(ComplexMath.conj(num1(args, name)))
+        "conj", "conjugate" -> ComplexMath.conj(num1(args, name))
         "arg" -> Num(ctx.angleMode.fromRadians(num1(args, name).arg))
         "polar" -> {
             val z = num1(args, name)
             Mat.of(z.abs, ctx.angleMode.fromRadians(z.arg))
         }
 
-        // --- matrices ---------------------------------------------------------
+        // --- matrices -------------------------------------------------------------
         "det" -> Num(MatrixMath.determinant(matrix1(args, name)))
         "inv", "inverse" -> MatrixMath.inverse(matrix1(args, name))
         "transpose", "transp" -> MatrixMath.transpose(matrix1(args, name))
@@ -236,15 +241,11 @@ object FunctionLibrary {
         }
         "dot" -> {
             expectCount(args, 2, name)
-            val a = args[0] as? Mat ?: throw MathError("dot expects two vectors")
-            val b = args[1] as? Mat ?: throw MathError("dot expects two vectors")
-            Num(MatrixMath.dot(a, b))
+            Num(MatrixMath.dot(matrixAt(args, 0, name), matrixAt(args, 1, name)))
         }
         "cross" -> {
             expectCount(args, 2, name)
-            val a = args[0] as? Mat ?: throw MathError("cross expects two vectors")
-            val b = args[1] as? Mat ?: throw MathError("cross expects two vectors")
-            MatrixMath.cross(a, b)
+            MatrixMath.cross(matrixAt(args, 0, name), matrixAt(args, 1, name))
         }
         "normalize", "unit" -> {
             val m = matrix1(args, name)
@@ -254,12 +255,10 @@ object FunctionLibrary {
         }
         "solve" -> {
             expectCount(args, 2, name)
-            val a = args[0] as? Mat ?: throw MathError("solve expects two matrices")
-            val b = args[1] as? Mat ?: throw MathError("solve expects two matrices")
-            MatrixMath.solve(a, b)
+            MatrixMath.solve(matrixAt(args, 0, name), matrixAt(args, 1, name))
         }
 
-        // --- misc -------------------------------------------------------------
+        // --- misc -------------------------------------------------------------------
         "fib" -> {
             val n = real1(args, name)
             if (Math.rint(n) != n || n < 0) throw MathError("fib expects a whole, non-negative number")
@@ -273,7 +272,7 @@ object FunctionLibrary {
         else -> throw MathError("Unknown function '$name'")
     }
 
-    // ---- shared helpers ------------------------------------------------------
+    // ---- shared helpers ----------------------------------------------------------
 
     /** Applies the angle mode to a real argument, leaving complex values alone. */
     private fun intoAngle(v: Num, ctx: MathContext): Num =

@@ -238,10 +238,11 @@ private fun CellEditor(state: MatrixState, viewModel: CalculatorViewModel) {
     val rows = if (state.editingA) state.rowsA else state.rowsB
     val cols = if (state.editingA) state.colsA else state.colsB
     val index = state.selectedCell
+    val gridName = if (state.editingA) "A" else "B"
     val label = if (index >= 0 && index < rows * cols) {
         val r = index / cols
         val c = index % cols
-        "${if (state.editingA) "A"}[${r + 1}, ${c + 1}]"
+        "$gridName[${r + 1}, ${c + 1}]"
     } else {
         "Select a cell"
     }

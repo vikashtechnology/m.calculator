@@ -551,7 +551,7 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    fun zoomGraph(factor: Float, focusX: Float, focusY: Float) {
+    fun zoomGraph(factor: Float, focusX: Double, focusY: Double) {
         val g = graph
         val newXMin = focusX + (g.xMin - focusX) / factor
         val newXMax = focusX + (g.xMax - focusX) / factor

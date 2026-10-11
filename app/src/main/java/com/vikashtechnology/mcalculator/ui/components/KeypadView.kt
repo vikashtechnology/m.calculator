@@ -74,13 +74,13 @@ private fun KeyButton(
     val useAlt = second && key.altAction != null
     val label = if (useAlt) key.altLabel ?: key.label else key.label
 
-    val (container, content, border) = when (key.style) {
-        KeyStyle.DIGIT -> Triple(colors.surfaceContainerHigh, colors.onSurface, null)
-        KeyStyle.OPERATOR -> Triple(colors.primaryContainer, colors.onPrimaryContainer, null)
-        KeyStyle.FUNCTION -> Triple(colors.surfaceContainer, colors.secondary, null)
-        KeyStyle.CONSTANT -> Triple(colors.surfaceContainer, colors.tertiary, null)
-        KeyStyle.ACCENT -> Triple(colors.primary, colors.onPrimary, null)
-        KeyStyle.DANGER -> Triple(colors.errorContainer, colors.onErrorContainer, null)
+    val (container, content) = when (key.style) {
+        KeyStyle.DIGIT -> colors.surfaceContainerHigh to colors.onSurface
+        KeyStyle.OPERATOR -> colors.primaryContainer to colors.onPrimaryContainer
+        KeyStyle.FUNCTION -> colors.surfaceContainer to colors.secondary
+        KeyStyle.CONSTANT -> colors.surfaceContainer to colors.tertiary
+        KeyStyle.ACCENT -> colors.primary to colors.onPrimary
+        KeyStyle.DANGER -> colors.errorContainer to colors.onErrorContainer
     }
     val activeContainer = if (useAlt && key.style == KeyStyle.FUNCTION) colors.secondaryContainer else container
 
@@ -88,7 +88,6 @@ private fun KeyButton(
         color = activeContainer,
         contentColor = content,
         shape = RoundedCornerShape(16.dp),
-        border = border?.let { BorderStroke(1.dp, it) },
         tonalElevation = if (key.style == KeyStyle.FUNCTION) 0.dp else 1.dp,
         modifier = modifier.pointerInput(key.id, second) {
             detectTapGestures(

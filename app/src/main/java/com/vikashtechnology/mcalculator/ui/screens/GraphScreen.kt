@@ -51,9 +51,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vikashtechnology.mcalculator.engine.CalculatorEngine
 import com.vikashtechnology.mcalculator.engine.Calculus
+import com.vikashtechnology.mcalculator.engine.Evaluator
 import com.vikashtechnology.mcalculator.engine.Expr
 import com.vikashtechnology.mcalculator.engine.Formatter
 import com.vikashtechnology.mcalculator.engine.MathContext
+import com.vikashtechnology.mcalculator.engine.MathError
 import com.vikashtechnology.mcalculator.ui.CalculatorViewModel
 import com.vikashtechnology.mcalculator.ui.GraphState
 import kotlin.math.abs
@@ -217,14 +219,17 @@ private fun BoxScope.TraceChip(
     val values = graph.functions.mapIndexedNotNull { index, fn ->
         if (!fn.visible) return@mapIndexedNotNull null
         val expr = parsed.getOrNull(index) ?: return@mapIndexedNotNull null
-        val y = runCatching {
-            val previous = ctx.valueOf("x")
-            ctx.setVariable("x", x)
-            val value = com.vikashtechnology.mcalculator.engine.Evaluator.eval(expr, ctx)
+        val previous = ctx.valueOf("x")
+        ctx.setVariable("x", x)
+        val traced = try {
+            val result = Evaluator.eval(expr, ctx)
+            Formatter.value(result)
+        } catch (e: MathError) {
+            null
+        } finally {
             if (previous == null) ctx.variables.remove("x") else ctx.setValue("x", previous)
-            value
-        }.getOrNull() ?: return@mapIndexedNotNull null
-        index to Formatter.value(value)
+        } ?: return@mapIndexedNotNull null
+        index to traced
     }
     Surface(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
