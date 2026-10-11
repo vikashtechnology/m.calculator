@@ -14,11 +14,13 @@ import sys
 
 
 def strip_code(text: str) -> str:
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    text = re.sub(r"//[^\n]*", "", text)
+    # Strings first: a `//` inside a string literal (a URL, a snippet) must not
+    # be mistaken for the start of a comment.
     text = re.sub(r'"""(?:.|\n)*?"""', '""', text)
     text = re.sub(r'"(?:\\.|[^"\\\n])*"', '""', text)
     text = re.sub(r"'(?:\\.|[^'\\\n])'", "''", text)
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    text = re.sub(r"//[^\n]*", "", text)
     return text
 
 

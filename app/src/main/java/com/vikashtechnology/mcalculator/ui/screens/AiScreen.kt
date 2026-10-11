@@ -191,7 +191,11 @@ fun AiScreen(
                 fileCallback?.onReceiveValue(null)
                 fileCallback = callback
                 return try {
-                    fileLauncher.launch(params?.createIntent())
+                    // createIntent() already carries the page's accept types;
+                    // fall back to a general picker when the params are missing.
+                    val intent = params?.createIntent()
+                        ?: Intent(Intent.ACTION_GET_CONTENT).apply { type = "*/*" }
+                    fileLauncher.launch(intent)
                     true
                 } catch (e: Exception) {
                     fileCallback = null
@@ -323,7 +327,6 @@ fun AiScreen(
                         settings.allowContentAccess = false
                         settings.loadsImagesAutomatically = true
                         settings.mediaPlaybackRequiresUserGesture = true
-                        settings.userAgentString = settings.userAgentString + " MCalculator/1.0"
                         webViewClient = webViewClient
                         webChromeClient = chromeClient
                         addJavascriptInterface(
