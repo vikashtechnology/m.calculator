@@ -19,11 +19,9 @@ android {
     // registered in the Google Cloud console, so the project signs every build
     // with the same committed key. Its SHA-1 is in app/signing/fingerprints.txt.
     val bundledKeystore = rootProject.file("app/signing/mcalculator.p12")
-    val webClientId: String = (findProperty("googleWebClientId") as String?) ?: ""
     val telemetryUrl: String = (findProperty("telemetryUrl") as String?) ?: ""
     val geminiKey: String = (findProperty("geminiApiKey") as String?) ?: ""
     val geminiModelName: String = (findProperty("geminiModel") as String?) ?: ""
-    val aiProxy: String = (findProperty("aiProxyUrl") as String?) ?: ""
 
     defaultConfig {
         applicationId = "com.advanceai.calculator"
@@ -33,17 +31,17 @@ android {
         versionName = "1.0.0"
         resourceConfigurations += listOf("en")
         vectorDrawables { useSupportLibrary = true }
-        // Empty means Google Sign-In is hidden in the app; the Ask AI screen
-        // then uses Puter's own sign-in, which also offers Google.
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$webClientId\"")
         // Where the anonymous usage counts go (the Cloudflare Worker in
         // admin/worker). Empty = the counters are never sent anywhere.
         buildConfigField("String", "TELEMETRY_URL", "\"$telemetryUrl\"")
         // A Google AI Studio key turns Ask AI into the native Gemini screen.
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
-        buildConfigField("String", "GEMINI_MODEL", "\"$geminiModelName\"")
-        // The stats Worker that holds the API key and checks Google sign-ins.
-        buildConfigField("String", "AI_PROXY_URL", "\"$aiProxy\"")
+        // Defaults to Gemini 3.6 Flash when the build does not name a model.
+        buildConfigField(
+            "String",
+            "GEMINI_MODEL",
+            "\"" + geminiModelName.ifBlank { "gemini-3.6-flash" } + "\""
+        )
     }
 
     signingConfigs {
@@ -123,10 +121,6 @@ dependencies {
     // WebViewAssetLoader serves the bundled "Ask AI" page over an https origin,
     // which Puter needs for sign-in (a file:// page has no origin to sign in).
     implementation("androidx.webkit:webkit:1.11.0")
-    // "Continue with Google": Credential Manager plus the Google ID helper.
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.0")
     // Backport of java.time for minSdk 24.
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 

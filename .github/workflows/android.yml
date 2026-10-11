@@ -56,41 +56,23 @@ jobs:
         id: apk
         continue-on-error: true
         env:
-          # Optional: set this repository secret to the Google *Web* OAuth client
-          # ID so "Continue with Google" appears in the app. Without it the app
-          # falls back to Puter's own sign-in, which also offers Google.
-          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
           # Optional: the Cloudflare Worker URL from admin/worker. Without it the
           # anonymous usage counters stay on the device.
           TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
-          # Optional: a Google AI Studio key. With it Ask AI runs natively
-          # (device Google accounts, no web login page); without it the bundled
-          # Puter page is used.
+          # Optional: a Google AI Studio key, used only for people who have not
+          # pasted their own key into the app yet.
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-          # Optional: the same Worker URL as TELEMETRY_URL. With it, Ask AI runs
-          # on the user's Google sign-in and the key stays on the Worker.
-          AI_PROXY_URL: ${{ secrets.AI_PROXY_URL }}
         run: |
           set -o pipefail
           GRADLE_ARGS=""
-          if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
-            GRADLE_ARGS="$GRADLE_ARGS -PgoogleWebClientId=$GOOGLE_WEB_CLIENT_ID"
-            echo "Google Sign-In: enabled (web client id from secrets)"
-          else
-            echo "Google Sign-In: off (no GOOGLE_WEB_CLIENT_ID secret)"
-            echo "Signing SHA-1 for registration:"
-            cat app/signing/fingerprints.txt | grep "SHA-1"
-          fi
-          if [ -n "$AI_PROXY_URL" ]; then
-            GRADLE_ARGS="$GRADLE_ARGS -PaiProxyUrl=$AI_PROXY_URL"
-            echo "Ask AI: OAuth through the Worker (no key in the app)"
-          fi
+          echo "Ask AI runs on the key each user pastes in; the model defaults to"
+          echo "gemini-3.6-flash unless -PgeminiModel says otherwise."
           if [ -n "$GEMINI_API_KEY" ]; then
             GRADLE_ARGS="$GRADLE_ARGS -PgeminiApiKey=$GEMINI_API_KEY"
-            echo "Ask AI: native Gemini screen"
+            echo "Ask AI: a fallback key is compiled in (users may still use their own)"
           else
-            echo "Ask AI: bundled Puter page (no GEMINI_API_KEY secret)"
+            echo "Ask AI: no fallback key compiled in (users bring their own)"
           fi
           if [ -n "$GEMINI_MODEL" ]; then
             GRADLE_ARGS="$GRADLE_ARGS -PgeminiModel=$GEMINI_MODEL"

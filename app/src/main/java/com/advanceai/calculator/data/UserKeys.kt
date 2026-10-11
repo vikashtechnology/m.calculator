@@ -14,6 +14,7 @@ object UserKeys {
 
     private const val PrefsName = "m_calculator_keys"
     private const val KeyGemini = "gemini_api_key"
+    private const val KeyModel = "gemini_model"
 
     fun geminiKey(context: Context): String =
         prefs(context).getString(KeyGemini, "").orEmpty()
@@ -24,6 +25,14 @@ object UserKeys {
 
     fun clearGeminiKey(context: Context) {
         prefs(context).edit().remove(KeyGemini).apply()
+    }
+
+    /** The model the user picked on the Ask AI card, or "" for the default. */
+    fun geminiModel(context: Context): String =
+        prefs(context).getString(KeyModel, "").orEmpty()
+
+    fun setGeminiModel(context: Context, model: String) {
+        prefs(context).edit().putString(KeyModel, model.trim()).apply()
     }
 
     /** "AIza…4f2c" — enough to recognise a key without printing all of it. */

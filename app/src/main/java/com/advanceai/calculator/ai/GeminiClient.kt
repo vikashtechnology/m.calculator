@@ -23,8 +23,11 @@ import java.net.URLEncoder
  *
  * The key is the user's own: they paste it once on the Ask AI screen (see
  * [UserKeys]) and it is kept in the app's private storage. Nothing to sign up
- * for, nothing tied to an account. A key baked into the build, or the optional
- * Worker from `admin/worker`, are only fallbacks for builds that ship one.
+ * for, nothing tied to an account. A key baked into the build is only a
+ * fallback for people who have not pasted one yet.
+ *
+ * Every call is one-shot: no conversation history is kept or sent, so questions
+ * never build on each other.
  */
 object GeminiClient {
 
@@ -60,18 +63,16 @@ object GeminiClient {
     val hasKey: Boolean
         get() = apiKey.isNotBlank()
 
-    val model: String = BuildConfig.GEMINI_MODEL.ifBlank { "gemini-2.5-flash" }
+    /** The model name compiled into the build, if any. */
+    val builtInModel: String = BuildConfig.GEMINI_MODEL
 
-    /** The Worker that holds the key and checks Google sign-ins, if any. */
-    val proxyUrl: String = BuildConfig.AI_PROXY_URL.trimEnd('/')
-
-    /** True when the AI is reached with the user's Google sign-in, not a key. */
-    val usesProxy: Boolean
-        get() = proxyUrl.isNotBlank()
+    /** What the next request will use: the user's pick, the build's, or 3.6 Flash. */
+    val model: String
+        get() = AiModels.resolve(requireNotNull(appContext) { "GeminiClient.install was not called" })
 
     /** True when Ask AI can answer at all. */
     val isConfigured: Boolean
-        get() = usesProxy || hasKey
+        get() = hasKey
 
     /** A file the user picked: the bytes are what actually gets sent. */
     data class Attachment(
@@ -91,95 +92,23 @@ object GeminiClient {
      * and nothing else, and admit when there is no question in it.
      */
     private fun systemPrompt(): String = buildString {
-        append("You are the solver inside a maths calculator app. ")
-        append("Solve only the question contained in the file the user uploads. ")
+        append("You are the maths assistant inside a calculator app. ")
+        append("Answer the question the user sent — typed, or shown in an uploaded ")
+        append("photo, PDF or text file — and nothing else. ")
         append("Reply with the answer first, then the steps, using short lines and ")
         append("plain text maths (^ for powers, sqrt() for roots, * for multiplication). ")
-        append("If the upload does not contain a maths question, reply exactly: ")
+        append("When only a file is sent, solve the question in that file; if it holds ")
+        append("no maths question, reply exactly: ")
         append("\"I could not find a maths question in this file.\" ")
-        append("Never invent a question, and never solve anything that is not in the file.")
+        append("Never invent a question, and never solve anything that was not sent.")
     }
 
-    /**
-     * [idToken] is the Google ID token from Credential Manager; it is what the
-     * Worker checks when [usesProxy] is true.
-     */
-    suspend fun solve(
-        question: String,
-        attachment: Attachment?,
-        idToken: String? = null
-    ): Answer = withContext(Dispatchers.IO) {
-        if (usesProxy) requestProxy(question, attachment, idToken)
-        else request(question, attachment)
-    }
+    suspend fun solve(question: String, attachment: Attachment?): Answer =
+        withContext(Dispatchers.IO) { request(question, attachment) }
 
     /** How the attachment travels: base64 in JSON, for either endpoint. */
     private fun encoded(attachment: Attachment): String =
         Base64.encodeToString(attachment.bytes, Base64.NO_WRAP)
-
-    private fun requestProxy(
-        question: String,
-        attachment: Attachment?,
-        idToken: String?
-    ): Answer {
-        if (attachment == null) return Answer(ok = false, error = "Choose a file first.")
-        if (idToken.isNullOrBlank()) {
-            return Answer(ok = false, error = "sign_in_required")
-        }
-        if (attachment.bytes.size > MaxAttachmentBytes) {
-            return Answer(ok = false, error = "That file is larger than 15 MB. Try a screenshot instead.")
-        }
-
-        val body = JSONObject()
-            .put("model", model)
-            .put("question", question)
-            .put(
-                "attachment",
-                JSONObject()
-                    .put("mimeType", attachment.mimeType)
-                    .put("name", attachment.name)
-                    .put("data", encoded(attachment))
-            )
-            .toString()
-            .toByteArray(Charsets.UTF_8)
-
-        val connection = (URL("$proxyUrl/v1/solve").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 20_000
-            readTimeout = 120_000
-            doOutput = true
-            setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            setRequestProperty("Authorization", "Bearer $idToken")
-            setRequestProperty("Content-Length", body.size.toString())
-        }
-
-        return try {
-            connection.outputStream.use { it.write(body) }
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            val text = stream?.bufferedReader()?.use { reader -> reader.readText() }.orEmpty()
-            val json = runCatching { JSONObject(text) }.getOrNull()
-            when {
-                code == 401 -> Answer(ok = false, error = "sign_in_required")
-                code in 200..299 -> {
-                    val answer = json?.optString("answer").orEmpty()
-                    if (answer.isNotBlank()) Answer(ok = true, text = answer)
-                    else Answer(ok = false, error = "No answer came back. Try again.")
-                }
-                else -> Answer(
-                    ok = false,
-                    error = json?.optString("error").orEmpty().ifBlank {
-                        "The solver answered HTTP $code."
-                    }
-                )
-            }
-        } catch (e: Exception) {
-            Log.w(Tag, "Worker request failed", e)
-            Answer(ok = false, error = e.message ?: "The request failed. Check the connection.")
-        } finally {
-            connection.disconnect()
-        }
-    }
 
     private fun request(question: String, attachment: Attachment?): Answer {
         if (apiKey.isBlank()) return Answer(ok = false, error = "no_key")
@@ -187,11 +116,21 @@ object GeminiClient {
             return Answer(ok = false, error = "That file is larger than 15 MB. Try a screenshot instead.")
         }
 
+        if (question.isBlank() && attachment == null) {
+            return Answer(ok = false, error = "Type a question or add a photo first.")
+        }
+
         val parts = JSONArray().apply {
             put(JSONObject().put("text", systemPrompt()))
             val asked = question.trim()
             if (asked.isNotEmpty()) {
-                put(JSONObject().put("text", "The user also added: $asked"))
+                put(
+                    JSONObject().put(
+                        "text",
+                        if (attachment == null) "The user asks: $asked"
+                        else "The user also added: $asked"
+                    )
+                )
             }
             if (attachment != null) {
                 put(
@@ -207,10 +146,9 @@ object GeminiClient {
 
         val body = JSONObject()
             .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", parts)))
-            .put(
-                "generationConfig",
-                JSONObject().put("temperature", 0.2).put("maxOutputTokens", 4096)
-            )
+            // Note: temperature/topP are ignored by the 3.6 and newer Flash
+            // models, so only the output ceiling is sent.
+            .put("generationConfig", JSONObject().put("maxOutputTokens", 8192))
             .toString()
             .toByteArray(Charsets.UTF_8)
 
@@ -286,7 +224,8 @@ object GeminiClient {
                 message.ifEmpty { "The model rejected that upload." }
             }
             401, 403 -> "The API key was refused. Check the GEMINI_API_KEY secret."
-            404 -> "The model \"$model\" is not available for this key."
+            404 -> "The model \"$model\" is not available for this key — pick another on the " +
+                "Ask AI settings card."
             429 -> "Too many requests just now. Wait a moment and try again."
             in 500..599 -> "The Gemini service is busy. Try again in a moment."
             else -> message.ifEmpty { "The request failed (HTTP $code)." }

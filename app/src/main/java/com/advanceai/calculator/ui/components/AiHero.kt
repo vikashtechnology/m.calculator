@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -29,8 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
- * The hero call-to-action for "Ask AI" on the calculator pad: upload a question
- * and have Gemini solve it with the user's own key.
+ * The hero call-to-action for "Ask AI" on the calculator pad: type, photograph
+ * or attach a question and have Gemini solve it with the user's own key.
  */
 @Composable
 fun AiHeroCard(
@@ -44,6 +45,7 @@ fun AiHeroCard(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 14.dp, vertical = 6.dp)
+            .shadow(5.dp, RoundedCornerShape(18.dp))
             .clickable(onClick = onOpenAi)
     ) {
         Box(
@@ -80,7 +82,7 @@ fun AiHeroCard(
                         color = colors.onPrimaryContainer
                     )
                     Text(
-                        text = "Upload a photo or document of a question — get it solved",
+                        text = "Type, photograph or attach a question — solved step by step",
                         style = MaterialTheme.typography.labelMedium,
                         color = colors.onPrimaryContainer.copy(alpha = 0.8f),
                         maxLines = 2,
@@ -128,7 +130,7 @@ fun AiHeroMenuRow(
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
                 )
                 Text(
-                    text = "Solve a question from a photo or document",
+                    text = "Type it, photograph it or attach a file",
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.onPrimaryContainer.copy(alpha = 0.8f),
                     maxLines = 1,

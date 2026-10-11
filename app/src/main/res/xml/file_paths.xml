@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Where the camera may write the photo it takes for Ask AI. -->
+<paths>
+    <cache-path name="ai_camera" path="ai_camera/" />
+    <files-path name="ai_files" path="ai/" />
+</paths>

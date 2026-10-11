@@ -68,7 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.advanceai.calculator.ui.components.AiHeroMenuRow
-import com.advanceai.calculator.ui.screens.AiNativeScreen
+import com.advanceai.calculator.ui.screens.AiChatScreen
 import com.advanceai.calculator.ui.screens.ConverterScreen
 import com.advanceai.calculator.ui.screens.GraphScreen
 import com.advanceai.calculator.ui.screens.MatrixScreen
@@ -149,10 +149,9 @@ fun AppRoot(viewModel: CalculatorViewModel) {
 
             Box(modifier = Modifier.fillMaxSize()) {
                 if (aiOpen) {
-                    // Always the native screen: it asks for the user's own
-                    // Gemini key when there is none, and offers the Puter page
-                    // from inside that card for anyone who prefers no key.
-                    AiNativeScreen(
+                    // Ask AI is a chat: type, photograph or attach, and the
+                    // answer comes back as a message. No memory by design.
+                    AiChatScreen(
                         onClose = { aiOpen = false },
                         showMessage = showMessage
                     )
@@ -433,6 +432,8 @@ private fun ToolTile(
         color = colors.surfaceContainer,
         contentColor = colors.secondary,
         shape = RoundedCornerShape(13.dp),
+        shadowElevation = 2.dp,
+        tonalElevation = 1.dp,
         modifier = modifier
     ) {
         Column(

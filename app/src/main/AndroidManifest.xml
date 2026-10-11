@@ -2,8 +2,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- The maths engine is 100% offline and needs no permissions. INTERNET is
-         used only by the optional "Ask AI" screen, which talks to Puter. -->
+         used only by "Ask AI", which talks to the Gemini API with the user's own
+         key; CAMERA and POST_NOTIFICATIONS belong to that screen as well. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Ask AI: photograph a question in the app. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Ask AI: tell the user when a question has been solved. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- A tablet or an emulator without a camera can still use everything else. -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
 
     <application
         android:allowBackup="true"
@@ -14,6 +26,16 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MCalculator">
+        <!-- Lets the camera write the photo it takes for Ask AI. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <activity
             android:name=".MainActivity"

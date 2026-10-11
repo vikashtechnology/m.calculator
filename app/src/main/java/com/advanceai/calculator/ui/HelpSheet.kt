@@ -87,14 +87,12 @@ fun HelpSheet(onDismiss: () -> Unit) {
             Section(
                 "Ask AI",
                 listOf(
-                    "Tap the Ask AI card at the top of the pad, or the Ask AI row in the menu.",
-                    "Upload a photo, a PDF or a text file of a question, then press Solve this question.",
-                    "It only solves the question in the file you upload, with the steps.",
-                    "Ask AI runs on your own free Gemini key: the first time, paste one (Get a free key",
-                    "takes you to Google AI Studio). The key stays on this phone and can be removed there.",
-                    "No account and no sign-in; the key is only sent to Google with the question.",
-                    "No key? The card also offers the free Puter page instead.",
-                    "Ask AI needs internet; everything else in the app works offline."
+                    "Tap the Ask AI card on the pad: type a question, take a photo, or attach a file.",
+                    "It answers as a chat, with the steps, and keeps no memory — each question stands alone.",
+                    "The gear icon holds your own free Gemini key (Get a free key opens Google AI Studio)",
+                    "and the model picker — Gemini 3.6 Flash by default, newer Flash models one tap away.",
+                    "An answer that arrives while you are on another screen shows up as a notification.",
+                    "Ask AI needs the internet, a camera only if you take a photo; everything else is offline."
                 )
             )
             Section(

@@ -11,10 +11,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -52,6 +55,16 @@ fun PadScreen(
         // Hero section: the AI entry point sits at the very top of the pad.
         AiHeroCard(onOpenAi = onOpenAi)
 
+        // The readout sits on its own raised card, which gives the pad depth.
+        Surface(
+            color = MaterialTheme.colorScheme.surface,
+            shape = RoundedCornerShape(20.dp),
+            shadowElevation = 4.dp,
+            tonalElevation = 2.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 4.dp)
+        ) {
         DisplayPanel(
             state = state,
             onExpressionChanged = { text, cursor -> viewModel.onExpressionChanged(text, cursor) },
@@ -69,6 +82,7 @@ fun PadScreen(
             onClearEntry = { viewModel.clearAll() },
             onHint = { showHelp = true }
         )
+        }
 
         Row(
             modifier = Modifier

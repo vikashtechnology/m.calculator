@@ -88,7 +88,9 @@ private fun KeyButton(
         color = activeContainer,
         contentColor = content,
         shape = RoundedCornerShape(16.dp),
-        tonalElevation = if (key.style == KeyStyle.FUNCTION) 0.dp else 1.dp,
+        tonalElevation = if (key.style == KeyStyle.FUNCTION) 0.dp else 2.dp,
+        // A soft shadow makes the keys read as physical buttons in both themes.
+        shadowElevation = if (key.style == KeyStyle.FUNCTION) 0.dp else 2.dp,
         modifier = modifier.pointerInput(key.id, second) {
             detectTapGestures(
                 onTap = { onClick() },

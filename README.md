@@ -22,8 +22,8 @@ handles real and complex numbers, matrices, calculus, units and statistics.
    release APKs).
 
 Requirements: Android 7.0 (API 24) or newer. Everything except **Ask AI** runs
-completely offline — the app asks for a single permission, `INTERNET`, and only
-the Ask AI screen ever uses it.
+completely offline; the app's permissions (`INTERNET`, `CAMERA`,
+`POST_NOTIFICATIONS`) belong to Ask AI alone.
 
 ## Features
 
@@ -99,35 +99,43 @@ between them. Every field recalculates as you type — there is no Solve button.
 | **Age** | Age in years/months/days plus total days/weeks/months and days to the next birthday |
 
 ### Ask AI (bring your own key — nothing to sign up for)
-The hero card at the top of the pad opens **Ask AI**: upload a photo, a PDF or a
-text file of a question and it comes back solved, with the working.
+The hero card at the top of the pad opens **Ask AI**, a chat:
+
+* **type** a question, **photograph** it with the in-app camera, or **attach** a
+  photo, PDF or text file — then send
+* answers come back as messages with the working, ready to copy
+* **no memory**: every question is sent on its own, nothing is stored on the
+  phone, and *New chat* (or closing the app) wipes the thread
+* if an answer arrives while you are elsewhere in the app, a notification tells
+  you it is ready
 
 It runs on a **Gemini API key the user pastes in themselves**:
 
-* the first time, Ask AI shows a card: paste a key, press *Save the key*
-* *Get a free key* opens `aistudio.google.com/apikey` in the browser — one click
-  with any Google account, no card, no sign-up form
-* the key is kept in the app's private storage, sent only to Google with the
-  question, and can be deleted from the same card at any time
-* nobody signs in to anything, no account is created, and nothing about the user
-  reaches this app's author
+* the Ask AI settings card (the gear) takes the key; *Get a free key* opens
+  `aistudio.google.com/apikey` — one click with any Google account, no card
+* the key stays in the app's private storage, is sent only to Google with the
+  question, and can be removed from the same card
+* the same card picks the model: **Gemini 3.6 Flash** by default, with 3.8
+  Flash, 3.5 Flash and 3.5 Flash-Lite one tap away (Google retires these on a
+  schedule, so switching is a tap rather than an update)
+* no sign-in, no account, and nothing about the user reaches this app's author
 
-Builders can still ship a fallback: with `GEMINI_API_KEY` (or `-PgeminiApiKey=`)
-the app calls Gemini with that key when the user has not saved one, and with
-`AI_PROXY_URL` it hands the question to the Worker from `admin/worker`, which
-verifies the user's Google sign-in and holds the key itself — that OAuth mode is
-there but off unless you configure it. The bundled Puter page
-(`assets/ai/index.html`) stays as a no-key-at-all option, reachable from the key
-card; note that Puter's own *Sign in with Google* opens Google's web page, which
-cannot list the accounts on the phone.
+Builders can compile in a fallback key (`GEMINI_API_KEY` secret or
+`-PgeminiApiKey=`), used only until the user saves one of their own.
+
+Permissions, and what they are for:
+
+| Permission | Why |
+| --- | --- |
+| `INTERNET` | Ask AI talking to the Gemini API. Nothing else leaves the phone. |
+| `CAMERA` | Photographing a question inside Ask AI — requested the first time the camera button is tapped, and never needed otherwise. |
+| `POST_NOTIFICATIONS` | The "your answer is ready" notification (Android 13+), requested when Ask AI opens. |
 
 Optional build properties:
 
 ```bash
--PaiProxyUrl=…          # Ask AI through your Worker (Google sign-in, key on the Worker)
--PgoogleWebClientId=…   # needed only for that Worker mode
--PgeminiApiKey=…        # a key that ships with the build, used when the user has none
--PgeminiModel=…         # optional model override, default gemini-2.5-flash
+-PgeminiApiKey=…        # a fallback key for people who have not pasted one
+-PgeminiModel=…         # override the default model, gemini-3.6-flash
 -PtelemetryUrl=…        # sends anonymous usage counts to the admin dashboard
 ```
 
@@ -143,29 +151,14 @@ a random per-install id: no expressions, results, files or accounts. The switch
 *Anonymous usage stats* in the drop-down menu turns it off, and builds without a
 `TELEMETRY_URL` never send anything at all.
 
-### Ask AI (optional, needs internet)
-The hero card at the top of the pad opens **Ask AI**, which solves a question you
-upload — a photo, a PDF or a text file — and shows the working. It is powered by
-[Puter.js](https://developer.puter.com/), which supplies both the account and the
-model, so the app needs no API keys and no backend of its own:
+## Look and feel
 
-* sign in with a Puter account, or create a temporary one with *Continue as guest*
-* upload a question, choose whether you want the steps, and press **Solve this question**
-* the prompt is deliberately narrow: the model is told to solve *only* the
-  question in the file, and to say so when the upload holds no maths question
-* photos go to the model directly; PDFs are read with pdf.js (first five pages);
-  `.txt`/`.md`/`.csv` files are read as text
-* sign-in opens a popup, which the app hosts in its own window, because that is
-  how Puter hands the token back
-
-The page lives in `app/src/main/assets/ai/index.html` and is served to the WebView
-over `https://appassets.androidplatform.net` by `WebViewAssetLoader` — a `file://`
-page has no origin Puter can sign in with.
-
-## Light and dark
-
-The app follows your phone theme — light in the day, dark at night — with a
-Material 3 palette tuned for both.
+Material 3 throughout: the app follows your phone theme — light in the day, dark
+at night — with a violet/cyan/amber palette tuned for both. Cards, keys and
+messages carry soft shadows so the surfaces read as layers rather than flat
+blocks: the readout sits on a raised card, keypad keys are physical buttons, the
+menu and the chat header are elevated sheets, and chat bubbles lift off the chat
+background.
 
 ## Building it yourself
 
@@ -206,13 +199,11 @@ app/src/main/java/com/advanceai/calculator/
 │                    matrix, calculus, units, formatter (no Android imports)
 ├── data/            SharedPreferences store for settings, variables, history,
 │                    the user's own API key and the anonymous usage counters
-├── ai/              Google sign-in (Credential Manager) and the Gemini client
+├── ai/              the chat state, the Gemini client and the notification
 ├── ui/              Compose UI: view model, keypads, sheets, theme
 │   ├── components/  keypad grid and display panel
 │   └── screens/     pad, graph, solver, matrix, units, stats, Ask AI, everyday tools
 └── MainActivity.kt
-app/src/main/assets/ai/  the Ask AI web page (HTML + Puter.js glue, used only
-                         when no Gemini key is configured)
 app/signing/         the key every build is signed with + its fingerprints
 admin/worker/        the Cloudflare Worker that serves the usage dashboard
 app/src/test/        JUnit suite for the engine

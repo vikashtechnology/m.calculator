@@ -205,6 +205,7 @@ fun DisplayPanel(
                 color = colors.errorContainer,
                 contentColor = colors.onErrorContainer,
                 shape = RoundedCornerShape(10.dp),
+                shadowElevation = 2.dp,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 6.dp)
