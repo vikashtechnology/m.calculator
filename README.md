@@ -27,9 +27,12 @@ and never touches the network.
 ## Features
 
 ### Navigation
-The six tools live in a **left sidebar** — three lines of two tiles (Calc, Graph /
-Solve, Matrix / Units, Stats) — so the keypad keeps the full height of the screen.
-Tap a tile to switch; the back button returns to the calculator from any tool.
+The six tools live in a **drop-down menu**: tap the ☰ button in the top bar and the
+panel drops down over the screen with three lines of two tiles (Calc, Graph /
+Solve, Matrix / Units, Stats). Pick a tile to switch, or dismiss it by tapping the
+scrim, the close icon, the ☰ button again, or the back button. Because the menu
+overlays rather than reserves space, every tool uses the full screen — and the
+keypad no longer shares the screen with a bottom tab bar.
 
 ### Calculator pad
 * Full expression parser: `2+3(4+1)`, `2π`, `2sin(30)`, `3!`, `50%`, `10 mod 3`
