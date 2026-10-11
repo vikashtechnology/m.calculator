@@ -96,6 +96,15 @@ fun HelpSheet(onDismiss: () -> Unit) {
                 )
             )
             Section(
+                "Anonymous usage stats",
+                listOf(
+                    "The menu has a switch for anonymous usage stats (on by default).",
+                    "It sends only counts — app opens, calculations, AI questions — with a random id.",
+                    "Expressions, answers, history and uploads never leave the phone.",
+                    "Turn it off at any time; nothing more is sent and what was pending is dropped."
+                )
+            )
+            Section(
                 "Units and statistics",
                 listOf(
                     "Convert tab: pick a category, type a value, switch units instantly.",

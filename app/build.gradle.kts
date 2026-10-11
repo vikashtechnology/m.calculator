@@ -20,6 +20,7 @@ android {
     // with the same committed key. Its SHA-1 is in app/signing/fingerprints.txt.
     val bundledKeystore = rootProject.file("app/signing/mcalculator.p12")
     val webClientId: String = (findProperty("googleWebClientId") as String?) ?: ""
+    val telemetryUrl: String = (findProperty("telemetryUrl") as String?) ?: ""
 
     defaultConfig {
         applicationId = "com.vikashtechnology.mcalculator"
@@ -32,6 +33,9 @@ android {
         // Empty means Google Sign-In is hidden in the app; the Ask AI screen
         // then uses Puter's own sign-in, which also offers Google.
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"$webClientId\"")
+        // Where the anonymous usage counts go (the Cloudflare Worker in
+        // admin/worker). Empty = the counters are never sent anywhere.
+        buildConfigField("String", "TELEMETRY_URL", "\"$telemetryUrl\"")
     }
 
     signingConfigs {

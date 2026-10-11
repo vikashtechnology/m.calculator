@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.vikashtechnology.mcalculator.data.HistoryEntry
 import com.vikashtechnology.mcalculator.data.Prefs
+import com.vikashtechnology.mcalculator.data.Telemetry
 import com.vikashtechnology.mcalculator.engine.AngleMode
 import com.vikashtechnology.mcalculator.engine.CalculatorEngine
 import com.vikashtechnology.mcalculator.engine.Calculus
@@ -114,7 +115,15 @@ data class SolverState(
 
 class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
 
+    private val appContext = app
+
     private val prefs = Prefs(app)
+
+    init {
+        Telemetry.install(app)
+        // One anonymous count per app start; the results stay on the phone.
+        Telemetry.record(app, Telemetry.EVENT_APP_OPEN)
+    }
 
     var ui by mutableStateOf(
         CalcUiState(
@@ -358,6 +367,7 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
                 )
                 prefs.saveHistory(history)
                 prefs.lastExpression = ui.expression
+                Telemetry.record(appContext, Telemetry.EVENT_CALC)
                 prefs.lastResult = formatted
             }
             is EngineResult.Err -> {

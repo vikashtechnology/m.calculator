@@ -621,7 +621,11 @@
         });
       })
       .then(function () {
-        if (!state.cancelled) setStatus("done", "ok");
+        if (!state.cancelled) {
+          setStatus("done", "ok");
+          // Anonymous count for the admin dashboard — no text is sent.
+          notify({ event: "solved" });
+        }
       })
       .catch(function (error) {
         if (state.cancelled) return;

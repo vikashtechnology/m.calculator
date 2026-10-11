@@ -119,14 +119,26 @@ To switch it on:
 Every build is signed with the key in `app/signing/`, so the fingerprint above
 never changes and Android updates install straight over the previous version.
 
+### Usage dashboard (optional)
+`admin/worker` holds a Cloudflare Worker that serves a small read-only dashboard:
+installs, active users (today / week / range) and calculations and AI questions
+per day, with a per-day table and chart. It needs one D1 database, no other
+service, and the whole deploy is five `wrangler` commands — see
+[`admin/README.md`](admin/README.md).
+
+The app sends only aggregate counts (app opens, calculations, AI questions) with
+a random per-install id: no expressions, results, files or accounts. The switch
+*Anonymous usage stats* in the drop-down menu turns it off, and builds without a
+`TELEMETRY_URL` never send anything at all.
+
 ### Ask AI (optional, needs internet)
 The hero card at the top of the pad opens **Ask AI**, which solves a question you
 upload — a photo, a PDF or a text file — and shows the working. It is powered by
 [Puter.js](https://developer.puter.com/), which supplies both the account and the
 model, so the app needs no API keys and no backend of its own:
 
-* sign in with a Puter account (or *Continue with Google* in the app header), or
-  create a temporary one with *Continue as guest*
+* sign in with a Puter account (or *Continue with Google* in the app header, which
+  links that same Google account to Puter), or create a temporary one with *Continue as guest*
 * upload a question, choose whether you want the steps, and press **Solve this question**
 * the prompt is deliberately narrow: the model is told to solve *only* the
   question in the file, and to say so when the upload holds no maths question
@@ -164,6 +176,13 @@ EOF
 ```
 
 Toolchain: AGP 8.5.2, Kotlin 2.0.21, Gradle 8.9, JDK 17, compileSdk 34, minSdk 24.
+
+Optional build properties (all safe to leave out):
+
+```bash
+-PgoogleWebClientId=…   # enables "Continue with Google" in Ask AI
+-PtelemetryUrl=…        # sends anonymous usage counts to the admin dashboard
+```
 
 ## Project layout
 

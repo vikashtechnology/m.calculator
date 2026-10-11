@@ -1,0 +1,21 @@
+# M Calculator usage stats — deploy with:  npx wrangler deploy
+name = "m-calculator-stats"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+# Create the database once, then paste the id it prints:
+#   npx wrangler d1 create m_calculator_stats
+#   npx wrangler d1 execute m_calculator_stats --remote --file=schema.sql
+[[d1_databases]]
+binding = "DB"
+database_name = "m_calculator_stats"
+database_id = "REPLACE_WITH_THE_ID_FROM_WRANGLER"
+
+# The dashboard password. Set it once, never commit it:
+#   npx wrangler secret put ADMIN_TOKEN
+#
+# [vars]
+# ADMIN_TOKEN = "only for local experiments: wrangler dev"
+
+[observability]
+enabled = true

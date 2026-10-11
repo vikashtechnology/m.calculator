@@ -50,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,6 +60,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -72,6 +74,7 @@ import com.vikashtechnology.mcalculator.ui.screens.GraphScreen
 import com.vikashtechnology.mcalculator.ui.screens.MatrixScreen
 import com.vikashtechnology.mcalculator.ui.screens.PadScreen
 import com.vikashtechnology.mcalculator.ui.screens.SolverScreen
+import com.vikashtechnology.mcalculator.data.Telemetry
 import com.vikashtechnology.mcalculator.ui.screens.EverydayTool
 import com.vikashtechnology.mcalculator.ui.screens.StatsScreen
 import com.vikashtechnology.mcalculator.ui.screens.ToolsScreen
@@ -94,10 +97,14 @@ private const val ToolsPerLine = 3
 
 @Composable
 fun AppRoot(viewModel: CalculatorViewModel) {
+    val context = LocalContext.current
     var tab by remember { mutableStateOf(AppTab.CALC) }
     var menuOpen by remember { mutableStateOf(false) }
     var aiOpen by remember { mutableStateOf(false) }
     var toolOpen by remember { mutableStateOf<EverydayTool?>(null) }
+    // Anonymous usage counts feed the admin dashboard; the switch can turn
+    // them off, and nothing is sent while it is off.
+    var statsOn by remember { mutableStateOf(Telemetry.isEnabled(context)) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val showMessage: (String) -> Unit = { message ->
@@ -214,6 +221,11 @@ fun AppRoot(viewModel: CalculatorViewModel) {
                         menuOpen = false
                         toolOpen = tool
                     },
+                    statsOn = statsOn,
+                    onStatsChange = { enabled ->
+                        statsOn = enabled
+                        Telemetry.setEnabled(context, enabled)
+                    },
                     onClose = { menuOpen = false }
                 )
             }
@@ -284,6 +296,8 @@ private fun DropDownMenuPanel(
     onSelect: (AppTab) -> Unit,
     onOpenAi: () -> Unit,
     onOpenTool: (EverydayTool) -> Unit,
+    statsOn: Boolean,
+    onStatsChange: (Boolean) -> Unit,
     onClose: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -375,6 +389,29 @@ private fun DropDownMenuPanel(
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
+            }
+
+            // --- anonymous usage counts (admin dashboard) --------------------
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Anonymous usage stats",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSurface
+                    )
+                    Text(
+                        text = "Counts of app opens, calculations and AI questions. " +
+                            "No expressions, answers or files leave the phone.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.onSurfaceVariant
+                    )
+                }
+                Switch(checked = statsOn, onCheckedChange = onStatsChange)
             }
         }
     }

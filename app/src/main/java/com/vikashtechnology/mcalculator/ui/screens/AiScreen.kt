@@ -63,6 +63,7 @@ import androidx.webkit.WebResourceErrorCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewClientCompat
 import com.vikashtechnology.mcalculator.ai.GoogleSignIn
+import com.vikashtechnology.mcalculator.data.Telemetry
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -416,6 +417,12 @@ fun AiScreen(
                                                     if (!payload.optBoolean("signedIn")) {
                                                         signInWithGoogle()
                                                     }
+                                                }
+                                                "solved" -> {
+                                                    Telemetry.record(
+                                                        context,
+                                                        Telemetry.EVENT_AI
+                                                    )
                                                 }
                                                 "googleSignOut" -> {
                                                     scope.launch {
