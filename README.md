@@ -1,11 +1,12 @@
 # AI Calculator
 
-An advanced scientific calculator for Android — offline, ad-free and open source.
+An advanced scientific calculator for Android — offline-first, ad-supported and
+open source.
 Written in Kotlin with Jetpack Compose, it ships a hand-written math engine that
 handles real and complex numbers, matrices, calculus, units and statistics.
 
-> **Status:** version 1.0.0. Unit tests cover the math engine, and every push is
-> compiled into an installable APK by GitHub Actions.
+> **Status:** version 1.1.0. Unit tests cover the math engine, and every push
+> is compiled into an installable APK by GitHub Actions.
 
 ---
 
@@ -21,9 +22,11 @@ handles real and complex numbers, matrices, calculus, units and statistics.
    and download the `m-calculator-apk` artifact (contains both the debug and
    release APKs).
 
-Requirements: Android 7.0 (API 24) or newer. Everything except **Ask AI** runs
-completely offline; the app's permissions (`INTERNET`, `CAMERA`,
-`POST_NOTIFICATIONS`) belong to Ask AI alone.
+Requirements: Android 7.0 (API 24) or newer. The maths always runs offline —
+the only two things that touch the network are **Ask AI** (your own key) and the
+**AdMob banner**, and both simply do nothing when there is no connection. Of the
+app's permissions (`INTERNET`, `CAMERA`, `POST_NOTIFICATIONS`), the camera and
+notifications belong to Ask AI alone; `INTERNET` also carries the ad request.
 
 ## Features
 

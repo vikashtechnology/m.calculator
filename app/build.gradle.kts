@@ -1,10 +1,19 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// AdMob test units published by Google. They always return a test ad, so they
+// are safe to build and tap on, but they must be replaced with the publisher's
+// own app ID and banner unit ID before the app goes to Google Play:
+//   gradle.properties  ->  admobAppId=…  admobBannerUnitId=…
+// or one build:  ./gradlew assembleRelease -PadmobAppId=… -PadmobBannerUnitId=…
+val testAdmobAppId = "ca-app-pub-3940256099942544~3347511713"
+val testAdmobBannerUnitId = "ca-app-pub-3940256099942544/9214589741"
 
 val keystoreProperties = Properties().apply {
     val f = rootProject.file("keystore.properties")
@@ -25,6 +34,11 @@ android {
     val telemetryUrl: String = (findProperty("telemetryUrl") as String?) ?: ""
     val geminiKey: String = (findProperty("geminiApiKey") as String?) ?: ""
     val geminiModelName: String = (findProperty("geminiModel") as String?) ?: ""
+    // AdMob: the publisher's own IDs when gradle.properties carries them,
+    // Google's test IDs otherwise.
+    val admobAppId: String = (findProperty("admobAppId") as String?) ?: testAdmobAppId
+    val admobBannerUnitId: String =
+        (findProperty("admobBannerUnitId") as String?) ?: testAdmobBannerUnitId
 
     defaultConfig {
         applicationId = "com.advanceai.calculator"
@@ -33,9 +47,13 @@ android {
         // Play needs a versionCode that goes *up* with every upload. CI passes
         // -PversionCode=… so a release can bump it without editing files.
         versionCode = (findProperty("versionCode") as String?)?.toIntOrNull() ?: 1
-        versionName = (findProperty("versionName") as String?) ?: "1.0.0"
+        versionName = (findProperty("versionName") as String?) ?: "1.1.0"
         resourceConfigurations += listOf("en")
         vectorDrawables { useSupportLibrary = true }
+        // UMP (the consent SDK) still reads the app ID from the manifest even
+        // though the ads SDK itself is given it programmatically; both come
+        // from this one value so they cannot drift apart.
+        manifestPlaceholders["admobAppId"] = admobAppId
         // Where the anonymous usage counts go (the Cloudflare Worker in
         // admin/worker). Empty = the counters are never sent anywhere.
         buildConfigField("String", "TELEMETRY_URL", "\"$telemetryUrl\"")
@@ -47,6 +65,9 @@ android {
             "GEMINI_MODEL",
             "\"" + geminiModelName.ifBlank { "gemini-3.6-flash" } + "\""
         )
+        // AdMob IDs the ads code reads at runtime.
+        buildConfigField("String", "ADMOB_APP_ID", "\"$admobAppId\"")
+        buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"$admobBannerUnitId\"")
     }
 
     signingConfigs {
@@ -98,10 +119,6 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
         buildConfig = true
@@ -115,6 +132,13 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+    }
+}
+
+// The kotlinOptions block this replaced was removed in Kotlin 2.4.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -133,6 +157,14 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+
+    // AdMob. The Next-Gen SDK is the one Google recommends for new work; the
+    // older play-services-ads line is in maintenance mode and retires in 2028.
+    // The banner lives in a Compose AndroidView, so no extra UI dependency.
+    implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.5.0")
+    // User Messaging Platform: the consent form shown before any ad is loaded
+    // in the EEA, the UK and Switzerland.
+    implementation("com.google.android.ump:user-messaging-platform:4.0.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

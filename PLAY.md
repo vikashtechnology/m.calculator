@@ -60,7 +60,8 @@ First release.
 • Matrices, complex numbers, 250+ unit conversions
 • GST, income tax, EMI, BMI, interest, profit, bases, age
 • Ask AI (optional, your own key): type, photograph or attach
-• Light and dark themes, no sign-up, no ads, works offline
+• Light and dark themes, no sign-up, works offline
+• Free, supported by a small banner ad
 ```
 
 **Closed-test invitation** — send this to your 12 testers (WhatsApp, email,
@@ -78,7 +79,7 @@ could you help me out?
 4. If anything looks wrong or confusing, tell me — your replies are what makes
    the next version better.
 
-It's free, no ads, and all the maths works offline. Thank you!
+It's free, and all the maths works offline. Thank you!
 ```
 
 Where the link comes from: Play Console → **Testing → Closed testing → Testers**
@@ -170,7 +171,10 @@ Suggested text:
   > • Ask AI (optional): type a question, photograph it or attach a file, and
   > read a step-by-step answer. It uses your own free Google AI Studio key, and
   > the chat keeps no history.
-  > • No sign-up. No ads. The maths never leaves your phone.
+  > • No sign-up. The maths never leaves your phone.
+  > • Free to use, paid for by one banner ad at the bottom of the screen. It
+  > never sees your calculations, and where the law requires a choice the app
+  > asks for consent before the first ad is requested.
   >
   > Anonymous usage counts can be switched off in the menu, and nothing is sent
   > while they are off.
@@ -182,6 +186,31 @@ Suggested text:
   Before publishing, open `admin/worker/worker.js`, set `CONTACT` at the top to
   the support email you use on the listing, and redeploy (paste and Deploy in
   Cloudflare — see [`WEB_SETUP.md`](WEB_SETUP.md)).
+
+## The ad units (AdMob)
+
+The banner is real AdMob code. Whether it serves a test ad or a paid one depends
+on the two IDs the build is given, and they come from `gradle.properties`:
+
+```properties
+admobAppId=ca-app-pub-xxxxxxxxxxxxxxxx~yyyyyyyyyy
+admobBannerUnitId=ca-app-pub-xxxxxxxxxxxxxxxx/zzzzzzzzzz
+```
+
+Both fall back to **Google's public test units** when they are not set, which is
+why a build straight off CI shows a "Test Ad" banner and earns nothing.
+
+* Get the real pair from <https://admob.google.com> → **Apps → Add app**
+  (the app ID, with the `~`) and **Ad units → Banner** (the unit ID, with the
+  `/`). One app can hold several units; the banner uses the first one.
+* The app ID is injected into the manifest meta-data from the same property, so
+  setting it in one place is enough — the consent SDK reads it there.
+* **Uploading a bundle that still carries the test app ID breaks Google's
+  policy.** Put the real values in `gradle.properties` (or pass
+  `-PadmobAppId=… -PadmobBannerUnitId=…`) before creating the release bundle.
+* On the first launch in the EEA, the UK or Switzerland the consent form appears
+  before any ad is requested; where Google requires a way back into it, the app
+  menu shows **Privacy settings**. Answer *App content → Ads* accordingly.
 
 ## Data safety form
 
@@ -198,10 +227,13 @@ what the code actually does:
 | Location, personal info, financial info, messages, contacts, health | **Not collected** |
 | Is data encrypted in transit? | **Yes** (HTTPS only) |
 | Can users request deletion? | **Yes** — contact email, or turn the counters off in the app |
-| Is data sold or used for advertising? | **No** |
+| **Device or other IDs → Advertising ID** | Collected by Google's Mobile Ads SDK when an ad loads, shared with Google for Advertising or marketing. Present in the ad-supported build only |
+| Is data sold or used for advertising? | **Yes** — the ad SDK uses the advertising ID to serve and measure ads. Nothing the user types, calculates or asks is ever used for advertising, and the maths stays offline |
 
 Content rating: answer the questionnaire honestly — a general-purpose
-calculator is "Everyone". Declare **no ads** and **no in-app purchases**.
+calculator is "Everyone". Declare **contains ads** (AdMob banners) and **no
+in-app purchases**. Play then asks for the app's **Ads** declaration separately
+in *App content → Ads*: answer "Yes, my app contains ads".
 
 ## The first upload, step by step
 
@@ -211,7 +243,7 @@ calculator is "Everyone". Declare **no ads** and **no in-app purchases**.
    has run a closed test — see below.
 2. **Create app** — name `AI Calculator`, default language, "App", "Free".
 3. **Set up your app** (the Console's checklist): privacy policy URL, app
-   access (everything works without a login — say so), ads = no, content rating
+   access (everything works without a login — say so), ads = yes, content rating
    questionnaire, target audience, data safety (table above).
 4. **Store listing** — the text and the three graphics from the table above.
 5. **App content → Signing** — enrol in Play App Signing if you have not already.
@@ -245,3 +277,9 @@ calculator is "Everyone". Declare **no ads** and **no in-app purchases**.
   the manifest with `required="false"`, so tablets without a camera still work.
 * If you also want the APK for phones beside the bundle, it is on the same
   release; Play itself only takes the `.aab`.
+* The banner is only laid out on screens with room to spare (about 630dp of
+  content, which covers ordinary phones); on a small screen or in split screen
+  no ad is requested at all, so the keypad can never be squeezed.
+* Ad revenue and the wording of the listing have to move together: the store
+  text, the data-safety answers and the privacy policy all say the app carries
+  ads now.

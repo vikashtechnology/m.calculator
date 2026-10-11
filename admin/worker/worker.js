@@ -494,9 +494,9 @@ const PRIVACY_HTML = `<!doctype html>
 <h1>AI Calculator — privacy policy</h1>
 <p class="sub">Last updated: 11 October 2026</p>
 
-<p>AI Calculator is an offline calculator for Android. It has no accounts, no
-sign-in and no advertising. This page explains the only two things that can ever
-leave your device, and how to switch them off.</p>
+<p>AI Calculator is an offline calculator for Android. It has no accounts and no
+sign-in, and every calculation happens on the device. This page explains the
+only three things that can ever leave it, and how to switch them off.</p>
 
 <h2>1. Anonymous usage counts (optional, on by default)</h2>
 <p>The app can send anonymous counts — how many times it was opened, how many
@@ -514,7 +514,31 @@ traced back to you.</p>
       app can be improved.</li>
 </ul>
 
-<h2>2. Ask AI (optional, only when you use it)</h2>
+<h2>2. Ads (the free version is paid for by a banner)</h2>
+<p>Some screens show one banner ad at the bottom, served by Google AdMob. When an
+ad is requested, Google's Mobile Ads SDK may read your device's <b>advertising
+ID</b> — the resettable identifier Android gives apps for advertising — and send
+it to Google so an ad can be chosen and measured. That is Google's processing,
+covered by Google's own policies:
+<a href="https://policies.google.com/technologies/ads">how Google uses
+information from apps that use its services</a>.</p>
+<ul>
+  <li><b>Never sent to advertisers:</b> the expressions you type, your results,
+      your history, your variables, your files and your photos. The ad code runs
+      beside the calculator, never inside it.</li>
+  <li><b>Your choice in the EEA, the UK and Switzerland:</b> the first launch
+      shows a consent form from Google that asks whether personalised ads are
+      allowed, and no ad is requested before it is answered. Change that answer
+      any time under <code>☰ → Privacy settings</code> (the row appears in the
+      menu wherever Google requires one).</li>
+  <li><b>Elsewhere:</b> Android's own ad settings
+      (<code>Settings → Privacy → Ads</code>) reset or delete the advertising ID
+      and turn off personalisation for every app on the phone.</li>
+  <li><b>Offline:</b> with no connection there is no ad either — the banner is
+      simply not drawn, and the calculator works exactly as before.</li>
+</ul>
+
+<h2>3. Ask AI (optional, only when you use it)</h2>
 <p>Ask AI is off until you paste your own Google Gemini API key into
 <code>☰ → Ask AI → ⚙</code>. The key is stored on your device only. When you send
 a question, the text you typed and any image or file you attached are sent to
@@ -529,16 +553,16 @@ on a server by this app.</p>
   <li><b>Delete:</b> remove the key in the app, and nothing more can be sent.</li>
 </ul>
 
-<h2>3. Everything else stays on the phone</h2>
+<h2>4. Everything else stays on the phone</h2>
 <p>Your history, variables, memory and settings are stored in the app's private
 storage on your device. They are not uploaded anywhere. Uninstalling the app
 removes them.</p>
 
-<h2>4. Children</h2>
+<h2>5. Children</h2>
 <p>The app is a general-purpose calculator, not directed at children. It does not
 knowingly collect personal information from anyone, of any age.</p>
 
-<h2>5. Contact</h2>
+<h2>6. Contact</h2>
 <p>Questions about this policy, or a request to have anonymous counts deleted:
 write to ${CONTACT}.</p>
 </body>

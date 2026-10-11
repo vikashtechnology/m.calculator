@@ -2,8 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- The maths engine is 100% offline and needs no permissions. INTERNET is
-         used only by "Ask AI", which talks to the Gemini API with the user's own
-         key; CAMERA and POST_NOTIFICATIONS belong to that screen as well. -->
+         used by "Ask AI", which talks to the Gemini API with the user's own
+         key, and by the AdMob banner; CAMERA and POST_NOTIFICATIONS belong to
+         the Ask AI screen. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Ask AI: photograph a question in the app. -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -26,6 +27,14 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MCalculator">
+        <!-- AdMob app ID. The ads SDK itself is handed this ID in code, but the
+             consent (UMP) SDK reads it from here, so both must match. The value
+             comes from gradle.properties (admobAppId), or Google's test app ID
+             when that property is not set. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="${admobAppId}" />
+
         <!-- Lets the camera write the photo it takes for Ask AI. -->
         <provider
             android:name="androidx.core.content.FileProvider"

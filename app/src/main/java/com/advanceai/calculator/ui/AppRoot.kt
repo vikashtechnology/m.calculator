@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,6 +54,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +69,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.advanceai.calculator.ads.AdBanner
+import com.advanceai.calculator.ads.Ads
+import com.advanceai.calculator.ads.activityOrNull
 import com.advanceai.calculator.ui.components.AiHeroMenuRow
 import com.advanceai.calculator.ui.theme.appChipColors
 import com.advanceai.calculator.ui.screens.AiChatScreen
@@ -96,6 +101,20 @@ private const val ItemsPerLine = 2
 
 /** Everyday calculators are three to a line so the menu stays compact. */
 private const val ToolsPerLine = 3
+
+/**
+ * Roughly what the header takes. It is only used to decide whether an ad slot
+ * fits, so a few dp either way changes nothing.
+ */
+private val TopBarHeight = 56.dp
+
+/**
+ * Room the calculator pad needs before an ad may take a slice of the screen:
+ * about 330dp for the hero card, the readout and the page chips, plus about
+ * 240dp so five rows of keys stay comfortably tappable. Screens that cannot
+ * offer this (small phones, split screen) simply show no ad.
+ */
+private val MinContentHeightForAds = 630.dp
 
 @Composable
 fun AppRoot(
@@ -128,88 +147,118 @@ fun AppRoot(
         }
     }
 
+    val activity = remember(context) { context.activityOrNull() }
+    // Ads need an activity for the consent form and the ad itself; without one
+    // (a preview, for instance) the app runs exactly as it did before.
+    val adsPossible = activity != null && !aiOpen
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .windowInsetsPadding(WindowInsets.safeDrawing)
         ) {
-            // Ask AI is a full-screen sub-page with its own header, so the app
-            // bar steps aside while it is open.
-            if (!aiOpen) {
-                // Explicitly typed so the compiler sees a plain lambda.
-                val closeTool: (() -> Unit)? = if (toolOpen == null) {
-                    null
-                } else {
-                    { toolOpen = null }
-                }
-                TopBar(
-                    title = toolOpen?.title ?: tab.label,
-                    onMenuClick = { menuOpen = !menuOpen },
-                    onBack = closeTool
-                )
-            }
+            // The ad slot only opens when the screen has room to spare: the
+            // calculator pad needs roughly [MinContentHeightForAds] for its hero,
+            // readout, page chips and keys, and a banner adds about 90dp on top of
+            // that. Short screens and split-screen windows simply get no ad, so the
+            // keypad can never be squeezed into something untappable.
+            val showAdSlot =
+                adsPossible && maxHeight >= TopBarHeight + MinContentHeightForAds
 
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (aiOpen) {
-                    // Ask AI is a chat: type, photograph or attach, and the
-                    // answer comes back as a message. No memory by design.
-                    AiChatScreen(
-                        onClose = { aiOpen = false },
-                        showMessage = showMessage
-                    )
-                } else if (toolOpen != null) {
-                    ToolsScreen(
-                        tool = toolOpen!!,
-                        onSelectTool = { toolOpen = it }
-                    )
-                } else {
-                    when (tab) {
-                        AppTab.CALC -> PadScreen(
-                            viewModel = viewModel,
-                            showMessage = showMessage,
-                            onOpenAi = { aiOpen = true }
-                        )
-                        AppTab.GRAPH -> GraphScreen(viewModel = viewModel, showMessage = showMessage)
-                        AppTab.SOLVE -> SolverScreen(viewModel = viewModel)
-                        AppTab.MATRIX -> MatrixScreen(viewModel = viewModel)
-                        AppTab.UNITS -> ConverterScreen(viewModel = viewModel, showMessage = showMessage)
-                        AppTab.STATS -> StatsScreen(viewModel = viewModel)
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+            ) {
+                // Ask AI is a full-screen sub-page with its own header, so the app
+                // bar steps aside while it is open.
+                if (!aiOpen) {
+                    // Explicitly typed so the compiler sees a plain lambda.
+                    val closeTool: (() -> Unit)? = if (toolOpen == null) {
+                        null
+                    } else {
+                        { toolOpen = null }
                     }
+                    TopBar(
+                        title = toolOpen?.title ?: tab.label,
+                        onMenuClick = { menuOpen = !menuOpen },
+                        onBack = closeTool
+                    )
                 }
 
-                SnackbarHost(
-                    hostState = snackbarHostState,
+                // Everything above the ad slot: the tool that is open, and the
+                // snackbar that belongs to it.
+                Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(12.dp)
-                )
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    if (aiOpen) {
+                        // Ask AI is a chat: type, photograph or attach, and the
+                        // answer comes back as a message. No memory by design.
+                        AiChatScreen(
+                            onClose = { aiOpen = false },
+                            showMessage = showMessage
+                        )
+                    } else if (toolOpen != null) {
+                        ToolsScreen(
+                            tool = toolOpen!!,
+                            onSelectTool = { toolOpen = it }
+                        )
+                    } else {
+                        when (tab) {
+                            AppTab.CALC -> PadScreen(
+                                viewModel = viewModel,
+                                showMessage = showMessage,
+                                onOpenAi = { aiOpen = true }
+                            )
+                            AppTab.GRAPH -> GraphScreen(viewModel = viewModel, showMessage = showMessage)
+                            AppTab.SOLVE -> SolverScreen(viewModel = viewModel)
+                            AppTab.MATRIX -> MatrixScreen(viewModel = viewModel)
+                            AppTab.UNITS -> ConverterScreen(viewModel = viewModel, showMessage = showMessage)
+                            AppTab.STATS -> StatsScreen(viewModel = viewModel)
+                        }
+                    }
 
-                // Dim the tool while the drop-down is open; tapping dismisses it.
-                if (menuOpen && !aiOpen) {
-                    Box(
+                    SnackbarHost(
+                        hostState = snackbarHostState,
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(colors.scrim.copy(alpha = 0.45f))
-                            .clickable(
-                                indication = null,
-                                interactionSource = remember { MutableInteractionSource() }
-                            ) { menuOpen = false }
+                            .align(Alignment.BottomCenter)
+                            .padding(12.dp)
+                    )
+                }
+
+                // The AdMob banner, pinned under everything else. It draws nothing
+                // of its own until an ad actually arrives, so this line costs no
+                // space when there is no fill.
+                if (showAdSlot) {
+                    AdBanner(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp)
                     )
                 }
             }
-        }
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing),
-            contentAlignment = Alignment.TopStart
-        ) {
+            // Dim the app while the drop-down is open; tapping dismisses it. This
+            // sits over the bar and the ad slot as well, so a tap meant for the
+            // menu can never land on the ad underneath it.
+            if (menuOpen && !aiOpen) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(colors.scrim.copy(alpha = 0.45f))
+                        .clickable(
+                            indication = null,
+                            interactionSource = remember { MutableInteractionSource() }
+                        ) { menuOpen = false }
+                )
+            }
+
             AnimatedVisibility(
                 visible = menuOpen,
                 enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
@@ -237,6 +286,13 @@ fun AppRoot(
                     },
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
+                    // Google only asks for this entry point where the privacy
+                    // rules require one; until then the row is not shown at all.
+                    onPrivacyOptions = if (activity != null && Ads.privacyOptionsRequired) {
+                        { Ads.showPrivacyOptions(activity) }
+                    } else {
+                        null
+                    },
                     onClose = { menuOpen = false }
                 )
             }
@@ -311,6 +367,7 @@ private fun DropDownMenuPanel(
     onStatsChange: (Boolean) -> Unit,
     themeMode: AppThemeMode,
     onThemeModeChange: (AppThemeMode) -> Unit,
+    onPrivacyOptions: (() -> Unit)?,
     onClose: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -421,6 +478,18 @@ private fun DropDownMenuPanel(
                         onClick = { onThemeModeChange(mode) },
                         label = { Text(mode.label) },
                         colors = appChipColors()
+                    )
+                }
+            }
+
+            // --- privacy ------------------------------------------------------
+            // Only present where Google requires a way back into the consent
+            // form (EEA/UK/Switzerland); nothing to show anywhere else.
+            if (onPrivacyOptions != null) {
+                TextButton(onClick = onPrivacyOptions) {
+                    Text(
+                        text = "Privacy settings",
+                        style = MaterialTheme.typography.labelLarge
                     )
                 }
             }

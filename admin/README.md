@@ -133,8 +133,10 @@ curl -s 'http://127.0.0.1:8787/v1/stats?days=7&token=localdev'
 ## Privacy policy page
 
 `GET /privacy` serves the policy the Play listing links to (an app that sends
-anything off the device needs a reachable URL). Set `CONTACT` at the top of
-`worker.js` to your support email before publishing, then redeploy.
+anything off the device needs a reachable URL). It covers the three things that
+can leave the phone: the anonymous usage counts, the AdMob banner's advertising
+ID, and Ask AI. Set `CONTACT` at the top of `worker.js` to your support email
+before publishing, then redeploy.
 
 ## Tests
 
