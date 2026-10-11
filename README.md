@@ -11,11 +11,15 @@ handles real and complex numbers, matrices, calculus, units and statistics.
 
 ## Get the app
 
-1. Open the [**latest-build release**](../../releases/latest) and download `app-release.apk`.
+1. Open the [**latest-build release**](../../releases/tag/latest-build) and
+   download `app-release.apk`. Every green build refreshes that same tag, so the
+   file there is always the newest working version (branch builds are marked as
+   pre-releases, which is why the direct tag link is used).
 2. On the phone, tap the downloaded file and allow *Install unknown apps* for your
    browser or file manager when Android asks.
 3. Alternatively, open the **Actions** tab, pick the newest green *Android CI* run
-   and download the `m-calculator-apk` artifact.
+   and download the `m-calculator-apk` artifact (contains both the debug and
+   release APKs).
 
 Requirements: Android 7.0 (API 24) or newer. The app requests **no permissions**
 and never touches the network.
@@ -119,6 +123,14 @@ rules as `Formatter`.
 python3 tools/make_icons.py     # regenerate the launcher icons
 python3 tools/reference.py      # print expected values for the tests
 ```
+
+## Continuous integration
+
+`.github/workflows/android.yml` runs on every push: it executes the unit tests,
+builds the debug and release APKs, uploads them as artifacts, and refreshes the
+`latest-build` release. If a build or test fails, the job posts the compiler
+errors and failing assertions to a `CI failure` issue so the run can be fixed
+from the report alone.
 
 ## License
 
