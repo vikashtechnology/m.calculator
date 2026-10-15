@@ -213,6 +213,47 @@ carries the real units. Remove the two lines and the build falls back to
   before any ad is requested; where Google requires a way back into it, the app
   menu shows **Privacy settings**. Answer *App content → Ads* accordingly.
 
+## Checking that the banner is working
+
+Three places say what is happening, in this order of usefulness:
+
+1. **On the phone: ☰ → Settings → the "Ads" box.** It names the units the build
+   carries and the last thing the banner did:
+
+   | What it says | What it means |
+   | --- | --- |
+   | *Banner is showing* | Working. Impressions are being recorded in AdMob. |
+   | *No ad right now — …* | The request reached Google; there was simply no ad to fill it. Normal for the first day or two of a new AdMob app, and in some countries. |
+   | *Starting the ads SDK…* / *Waiting for the consent form…* | Still getting ready. If it stays here, the phone has no working connection to Google. |
+   | *No room for a banner on this screen* | The screen is too short for the ad slot (616dp of usable height is needed, after the status and navigation bars). The calculator fills the gap, no ad is requested. |
+   | *Google test units* | This is a debug build, or the IDs are missing from `gradle.properties`. Test ads earn nothing. |
+
+2. **In AdMob: Apps → AI Calculator → Ad units → the banner unit.** Impressions
+   and requests are counted per day. A handful of requests with zero impressions
+   on the first day is normal.
+
+3. **Logcat**, if you have a computer attached: `adb logcat -s Ads AdBanner` —
+   every step (SDK start, consent result, load success, failure with Google's
+   own code and message) is logged there.
+
+### Two things that are not faults
+
+* **"No ads to show" for the first day or two.** A brand-new AdMob app has no
+  serving history; Google fills it in as it learns. Nothing to fix, and nothing
+  to change in the app.
+* **An ad that never appears in a debug build.** Debug builds deliberately ask
+  for Google's test ads instead of the real units, so that tapping them while
+  testing can never count as invalid traffic on the account. Live ads only come
+  from the release APK/AAB.
+
+### Never tap your own live ads
+
+Clicking or repeatedly refreshing ads on the app's own units is invalid traffic,
+and it is the fastest way to have an AdMob account suspended. To test safely:
+add the phone as a **test device** (AdMob → the gear icon → *Test devices*; you
+need the phone's advertising ID from Android's Settings → Privacy → Ads), or
+install a debug build, which uses Google's test units by design.
+
 ## Creating the AdMob app and ad unit, click by click
 
 1. **Sign in** at <https://admob.google.com> with the Google account you want to

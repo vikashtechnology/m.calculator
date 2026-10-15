@@ -188,6 +188,23 @@ a random per-install id: no expressions, results, files or accounts. The switch
 *Anonymous usage stats* in the drop-down menu turns it off, and builds without a
 `TELEMETRY_URL` never send anything at all.
 
+## Ads, and checking they work
+
+One banner-only AdMob ad sits in a fixed slot at the bottom of the calculator
+(`AppRoot`), reserved from the first frame so it can never resize the keypad.
+Consent (Google's UMP) is settled before any request, and the menu grows a
+**Privacy settings** row wherever Google requires one.
+
+**Debug builds and builds without IDs use Google's test units**, never the live
+ones — tapping your own ads is invalid traffic, so the release build is the only
+one that serves real ads (see `buildTypes { debug { … } }` in
+`app/build.gradle.kts`).
+
+Each step reports itself, so "there is no ad" can be told apart from "the ads are
+broken": **☰ → Settings → Ads** shows the current state and the units in use, the
+same messages go to logcat under the `Ads` tag, and `PLAY.md` has a table of what
+each state means and how to check the AdMob console.
+
 ## Look and feel
 
 Material 3 throughout: the app follows your phone theme — light in the day, dark

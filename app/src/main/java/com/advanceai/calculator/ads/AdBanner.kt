@@ -9,6 +9,7 @@ import com.google.android.libraries.ads.mobile.sdk.banner.AdView
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 
 /**
  * The AdMob banner.
@@ -36,7 +37,7 @@ fun AdBanner(modifier: Modifier = Modifier) {
         update = { view ->
             if (slot.claim()) {
                 val request = BannerAdRequest.Builder(Ads.bannerUnit, AdSize.BANNER).build()
-                view.loadAd(request, EmptyAdLoadCallback)
+                view.loadAd(request, ReportingAdLoadCallback)
             }
             // A banner can come back blank without this nudge.
             view.requestLayout()
@@ -46,10 +47,21 @@ fun AdBanner(modifier: Modifier = Modifier) {
 }
 
 /**
- * Nothing to do on either outcome: a loaded ad draws itself, and a failed one
- * leaves the slot empty. Neither is worth a user-visible message.
+ * A loaded ad draws itself and a failed one leaves the slot empty — neither is
+ * worth interrupting the user for. Both outcomes are reported to [Ads] though,
+ * which logs them and shows the result in Settings: otherwise "there is no ad"
+ * and "the ads are broken" look exactly the same from the outside, which is
+ * what makes a banner impossible to diagnose.
  */
-private object EmptyAdLoadCallback : AdLoadCallback<BannerAd>
+private object ReportingAdLoadCallback : AdLoadCallback<BannerAd> {
+    override fun onAdLoaded(ad: BannerAd) {
+        Ads.reportLoaded()
+    }
+
+    override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+        Ads.reportFailed(loadAdError)
+    }
+}
 
 /** Hands out a single "yes" so the ad is requested exactly once per AdView. */
 private class OneShot {

@@ -200,8 +200,20 @@ fun AppRoot(
             // rows of keys, and the threshold covers all of that plus the
             // banner. Short screens and split-screen windows simply get no ad,
             // so the keypad can never be squeezed into something untappable.
-            val showAdSlot =
-                adsPossible && maxHeight >= TopBarHeight + MinContentHeightForAds
+            // Whether the screen has room for the banner, regardless of which
+            // screen is open — the status in Settings uses this, so opening Ask
+            // AI (which hides the ad) does not look like a fault.
+            val adSlotFits = maxHeight >= TopBarHeight + MinContentHeightForAds
+            val showAdSlot = adsPossible && adSlotFits
+
+            // Why there is no banner, when there is none, so the Settings row can
+            // say something better than "nothing happened".
+            LaunchedEffect(activity == null, adSlotFits) {
+                when {
+                    activity == null -> Ads.reportNoActivity()
+                    !adSlotFits -> Ads.reportSlotHidden(maxHeight.value.toInt())
+                }
+            }
 
             Column(
                 modifier = Modifier

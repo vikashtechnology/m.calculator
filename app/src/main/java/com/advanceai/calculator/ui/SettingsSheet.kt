@@ -7,11 +7,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -20,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.advanceai.calculator.ads.Ads
 import com.advanceai.calculator.data.AppSettings
 import com.advanceai.calculator.engine.DigitGrouping
 import com.advanceai.calculator.engine.DisplayOptions
@@ -105,6 +108,47 @@ fun SettingsSheet(
                 checked = settings.keySound,
                 onCheckedChange = { onChange(settings.copy(keySound = it)) }
             )
+
+            // --- ads ----------------------------------------------------------
+            SettingTitle(
+                "Ads",
+                "One banner at the bottom of the calculator, from Google AdMob. " +
+                    "This line says whether it is showing."
+            )
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = Ads.status,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "Units in this build: ${Ads.unitSummary}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Banner unit: ${Ads.bannerUnit}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (Ads.status.startsWith("No ad right now")) {
+                        Text(
+                            text = "A brand-new AdMob app often answers like this for a day or " +
+                                "two before ads start serving. Nothing to fix.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
 
             Text(
                 text = "Results always keep the full 12-digit precision internally; " +

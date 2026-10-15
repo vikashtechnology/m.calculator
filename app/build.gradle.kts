@@ -84,6 +84,13 @@ android {
             versionNameSuffix = "-debug"
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("bundled")
+            // Debug builds always show Google's test ads, never the live units.
+            // Anyone tapping an ad in a debug build would otherwise count as
+            // invalid traffic on the publisher's own AdMob account, which is
+            // exactly what gets accounts suspended.
+            buildConfigField("String", "ADMOB_APP_ID", "\"$testAdmobAppId\"")
+            buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"$testAdmobBannerUnitId\"")
+            manifestPlaceholders["admobAppId"] = testAdmobAppId
         }
         release {
             isMinifyEnabled = false
