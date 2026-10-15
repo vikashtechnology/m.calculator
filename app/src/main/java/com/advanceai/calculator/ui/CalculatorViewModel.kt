@@ -147,6 +147,8 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
     private fun displayOptions(): DisplayOptions =
         DisplayOptions(settings.digits, settings.grouping)
 
+    // The app always opens at 0: the expression and the answer from last time are
+    // not carried over. History keeps the sums themselves, so nothing is lost.
     var ui by mutableStateOf(
         CalcUiState(
             angleMode = prefs.angleMode,
@@ -154,8 +156,8 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
             memory = prefs.memory,
             variables = prefs.loadVariables(),
             history = prefs.loadHistory(),
-            expression = prefs.lastExpression,
-            resultText = prefs.lastResult
+            expression = "",
+            resultText = ""
         )
     )
         private set
@@ -411,9 +413,7 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
                     ans = result.value
                 )
                 prefs.saveHistory(history)
-                prefs.lastExpression = ui.expression
                 Telemetry.record(appContext, Telemetry.EVENT_CALC)
-                prefs.lastResult = formatted
             }
             is EngineResult.Err -> {
                 ui = ui.copy(

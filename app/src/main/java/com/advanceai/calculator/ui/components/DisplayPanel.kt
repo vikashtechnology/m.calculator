@@ -160,6 +160,8 @@ fun DisplayPanel(
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Medium
             )
+            // Nothing typed yet shows a plain 0 — the readout of a calculator
+            // that has just been opened, not a greyed-out hint.
             if (state.expression.isEmpty()) {
                 Text(
                     text = "0",
@@ -167,7 +169,7 @@ fun DisplayPanel(
                         fontFamily = FontFamily.Monospace,
                         fontSize = expressionSize
                     ),
-                    color = colors.onSurfaceVariant.copy(alpha = 0.6f),
+                    color = colors.onSurface,
                     modifier = Modifier
                         .align(Alignment.CenterStart)
                         .padding(vertical = 8.dp)

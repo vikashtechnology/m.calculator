@@ -86,6 +86,14 @@ check("tables were created",
       [...tables].join());
 check("health lists secrets", body.secrets && body.secrets.ADMIN_TOKEN === true);
 check("health hides no values", JSON.stringify(body).indexOf("localdev") === -1);
+// The endpoints map doubles as "which version is deployed?" — /v1/about only
+// exists in the round that added the editable About page, so seeing it here
+// means the paste took.
+check(
+  "health lists the about endpoint",
+  typeof body.endpoints?.about === "string" && body.endpoints.about.includes("/v1/about"),
+  String(body.endpoints?.about)
+);
 
 // the tables are only created once per isolate
 res = await worker.fetch(new Request("https://x.workers.dev/health"), env);

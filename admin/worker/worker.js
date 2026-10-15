@@ -409,6 +409,7 @@ async function handleHealth(env) {
       privacy: "GET /privacy  (the URL for the Play Store listing)",
       stats: "GET /v1/stats?days=30&token=…",
       events: "POST /v1/events",
+      about: "GET /v1/about   PUT /v1/about?token=…  (the text of the app's About page)",
       solve: "POST /v1/solve  (optional; the app uses the user's own key)",
     },
     note:
@@ -751,7 +752,12 @@ const DASHBOARD_HTML = `<!doctype html>
   <div class="row">
     <input type="password" id="token" placeholder="admin token" style="min-width:240px">
     <button id="load">Show the stats</button>
-    <span class="muted">Set with <code>wrangler secret put ADMIN_TOKEN</code></span>
+  </div>
+  <div class="muted" style="margin-top:8px">
+    The token is the <code>ADMIN_TOKEN</code> secret of this Worker. Forgotten it?
+    Cloudflare → Workers &amp; Pages → this Worker → Settings → Variables and
+    Secrets → <code>ADMIN_TOKEN</code> → Edit, save a new one, then type it here.
+    It is remembered in this browser only.
   </div>
 </div>
 

@@ -87,8 +87,14 @@ fun AboutScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(6.dp))
+        // Not `R.mipmap.ic_launcher`: from API 26 that id resolves to the
+        // adaptive-icon XML in `mipmap-anydpi-v26`, and Compose's
+        // `painterResource` refuses anything that is not a vector or a raster
+        // asset — it throws "Only VectorDrawables and rasterized asset types are
+        // supported" and the app closes. `drawable-nodpi/app_icon.png` is the
+        // same artwork as a plain bitmap, so it always loads.
         Image(
-            painter = painterResource(R.mipmap.ic_launcher),
+            painter = painterResource(R.drawable.app_icon),
             contentDescription = null,
             modifier = Modifier.size(96.dp)
         )

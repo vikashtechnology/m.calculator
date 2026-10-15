@@ -58,14 +58,6 @@ class Prefs(context: Context) {
         get() = Double.fromBits(sp.getLong(KEY_MEMORY, 0L))
         set(value) = sp.edit { putLong(KEY_MEMORY, value.toBits()) }
 
-    var lastExpression: String
-        get() = sp.getString(KEY_LAST_EXPR, "") ?: ""
-        set(value) = sp.edit { putString(KEY_LAST_EXPR, value) }
-
-    var lastResult: String
-        get() = sp.getString(KEY_LAST_RESULT, "") ?: ""
-        set(value) = sp.edit { putString(KEY_LAST_RESULT, value) }
-
     /** Significant digits shown in results: one of [DisplayOptions.DIGIT_CHOICES]. */
     var precision: Int
         get() = sp.getInt(KEY_PRECISION, DisplayOptions.DEFAULT.significantDigits)
@@ -171,8 +163,6 @@ class Prefs(context: Context) {
         const val KEY_ANGLE = "angle_mode"
         const val KEY_POLAR = "polar_mode"
         const val KEY_MEMORY = "memory"
-        const val KEY_LAST_EXPR = "last_expression"
-        const val KEY_LAST_RESULT = "last_result"
         const val KEY_VARIABLES = "variables"
         const val KEY_HISTORY = "history"
         const val KEY_PRECISION = "precision"

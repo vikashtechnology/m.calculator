@@ -197,6 +197,14 @@ links change without a new APK. The last copy that arrived is kept on the phone,
 so the page works offline; with nothing saved yet it shows the bundled text.
 `admin/WEB_SETUP.md` walks through editing it.
 
+## What the calculator shows when it opens
+
+It starts at **0** — the sum or the answer from the last session is not put back
+on the display. Nothing is lost either way: **History** keeps the previous sums
+with their answers, and tapping one brings it back. The display keeps the
+talents it had (it grows, wraps and scrolls rather than cutting a long number
+off), and the 0 that greets you is the readout, not a grey hint.
+
 ## Layout rules
 
 The screen never hides something the user needs:

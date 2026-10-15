@@ -9,6 +9,9 @@ Checks every .kt file under app/src for:
   * Java-style Double.isNaN / .size() instead of Kotlin equivalents
   * a Material icon used without the import that brings it in (a compile error
     that costs a ten-minute CI round otherwise)
+  * `painterResource(R.mipmap.ic_launcher)`, which compiles and then throws at
+    runtime on any phone running Android 8 or newer (the id resolves to the
+    adaptive-icon XML, and Compose only loads vectors and raster assets)
 """
 import pathlib
 import re
@@ -27,6 +30,10 @@ def strip_code(text: str) -> str:
 
 
 BAD_PATTERNS = {
+    r"painterResource\(\s*R\.mipmap\.": (
+        "adaptive icons cannot be loaded by painterResource — use a raster "
+        "drawable such as R.drawable.app_icon"
+    ),
     r"\bNum\(\s*(ComplexMath|outAngle|fromAngle|reciprocal)\b": "redundant Num() wrapper",
     r"Double\.isNaN": "use Kotlin's x.isNaN()",
     r"\.size\(\)": "use Kotlin's x.size",

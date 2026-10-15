@@ -124,6 +124,27 @@ Notes:
 * `GET /v1/about` is public (the app reads it without a token); saving needs the
   admin token, exactly like the stats.
 
+### If the dashboard will not let you in
+
+* **It keeps asking for the token.** The token is remembered in the browser you
+  typed it into and nowhere else, so a new phone, a different browser or cleared
+  site data means typing it again.
+* **It says "That token was not accepted."** Either it is not the token this
+  Worker was given, or the `ADMIN_TOKEN` secret was changed afterwards.
+  Cloudflare never shows a secret back, so the way forward is to set a new one:
+  **Workers & Pages → your Worker → Settings → Variables and Secrets →
+  `ADMIN_TOKEN` → Edit**, save a new value, then type that value in. `/health`
+  is worth a look as well — it reports `"ADMIN_TOKEN": true` when the secret is
+  in place.
+* **You wanted to change the Worker code but the editor is read-only.** That
+  means this Worker was last deployed from a terminal or from the GitHub Action
+  rather than pasted in by hand; Cloudflare does not allow hand-editing those.
+  Use the same route that deployed it (Actions → **Dashboard worker** → *Run
+  workflow*), which deploys `admin/worker/worker.js` from the repository.
+* **Which version is live?** `GET /health` lists the endpoints the deployed
+  Worker knows. If `/v1/about` is not in that list, the deployed copy is older
+  than the About editor — paste `worker.js` again (step 4) or run the action.
+
 ## 7. Point the app at it (GitHub, one field)
 
 1. Open <https://github.com/vikashtechnology/m.calculator/settings/secrets/actions>
