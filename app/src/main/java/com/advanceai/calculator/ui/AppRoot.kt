@@ -335,6 +335,10 @@ fun AppRoot(
                     } else {
                         null
                     },
+                    onOpenSettings = {
+                        menuOpen = false
+                        settingsOpen = true
+                    },
                     onClose = { menuOpen = false }
                 )
             }
@@ -419,6 +423,7 @@ private fun DropDownMenuPanel(
     themeMode: AppThemeMode,
     onThemeModeChange: (AppThemeMode) -> Unit,
     onPrivacyOptions: (() -> Unit)?,
+    onOpenSettings: () -> Unit,
     onClose: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -513,10 +518,7 @@ private fun DropDownMenuPanel(
             }
 
             // --- settings ----------------------------------------------------
-            TextButton(onClick = {
-                settingsOpen = true
-                menuOpen = false
-            }) {
+            TextButton(onClick = onOpenSettings) {
                 Text(
                     text = "Settings — digits shown, digit grouping, key feedback",
                     style = MaterialTheme.typography.labelLarge
