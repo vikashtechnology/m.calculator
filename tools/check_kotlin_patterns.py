@@ -7,6 +7,8 @@ Checks every .kt file under app/src for:
   * redundant Num(...) wrappers around values that already are Num
   * an `if` without `else` used as an expression inside a string template
   * Java-style Double.isNaN / .size() instead of Kotlin equivalents
+  * a Material icon used without the import that brings it in (a compile error
+    that costs a ten-minute CI round otherwise)
 """
 import pathlib
 import re
@@ -50,6 +52,24 @@ def main() -> int:
                     problems += 1
             if "${if (" in line and " else " not in line:
                 print(f"TEMPLATE {path}:{number}: if without else in a template")
+                problems += 1
+
+        # `Icons.Filled.Tune` needs `import ...material.icons.filled.Tune`; without
+        # it Kotlin says "Unresolved reference 'Tune'" only in CI.
+        imports = set(re.findall(r"^import (\S+)$", raw, re.M))
+        for match in re.finditer(
+            r"Icons\.(AutoMirrored\.)?(Filled|Outlined|Rounded|Sharp|TwoTone)?\.?(\w+)", raw
+        ):
+            mirrored, style, name = match.group(1), match.group(2) or "Filled", match.group(3)
+            package = "androidx.compose.material.icons."
+            wanted = (
+                package + "automirrored." + style.lower() + "." + name
+                if mirrored
+                else package + style.lower() + "." + name
+            )
+            if wanted not in imports:
+                hint = "import " + wanted
+                print(f"ICON {path}: {match.group(0)} without '{hint}'")
                 problems += 1
 
         # `var x by remember { ... }` only compiles with the delegation operators
