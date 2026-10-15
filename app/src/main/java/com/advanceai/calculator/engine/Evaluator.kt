@@ -10,7 +10,9 @@ class MathContext(
     val variables: MutableMap<String, Value> = LinkedHashMap(),
     var ans: Value = Num.ZERO,
     /** When true the display renders complex results in polar form. */
-    var polarMode: Boolean = false
+    var polarMode: Boolean = false,
+    /** How results are printed: digits shown, and optional Indian grouping. */
+    var display: DisplayOptions = DisplayOptions.DEFAULT
 ) {
     fun valueOf(name: String): Value? = variables[name.lowercase()]
 
@@ -22,7 +24,7 @@ class MathContext(
         variables[name.lowercase()] = value
     }
 
-    fun copy(): MathContext = MathContext(angleMode, LinkedHashMap(variables), ans, polarMode)
+    fun copy(): MathContext = MathContext(angleMode, LinkedHashMap(variables), ans, polarMode, display)
 }
 
 /** Result of evaluating an expression. */

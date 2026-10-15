@@ -2,7 +2,9 @@ package com.advanceai.calculator.engine
 
 import java.math.BigInteger
 import java.time.LocalDate
+import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 /**
  * The "everyday" calculators: money, tax, health, percentages and a few extra
@@ -515,6 +517,67 @@ object Everyday {
             totalWeeks = ChronoUnit.WEEKS.between(dateOfBirth, today),
             totalMonths = ChronoUnit.MONTHS.between(dateOfBirth, today),
             nextBirthdayInDays = ChronoUnit.DAYS.between(today, nextBirthday)
+        )
+    }
+
+    /**
+     * The distance between two dates, counted the way a calendar does: whole
+     * years, then months, then the days left over, plus the plain totals.
+     */
+    data class DateSpan(
+        val years: Int,
+        val months: Int,
+        val days: Int,
+        val totalDays: Long,
+        val totalWeeks: Long,
+        val totalMonths: Long,
+        val forward: Boolean
+    )
+
+    fun daysBetween(from: LocalDate, to: LocalDate): DateSpan {
+        val forward = !to.isBefore(from)
+        val start = if (forward) from else to
+        val end = if (forward) to else from
+
+        val years = ChronoUnit.YEARS.between(start, end).toInt()
+        var anchor = start.plusYears(years.toLong())
+        val months = ChronoUnit.MONTHS.between(anchor, end).toInt()
+        anchor = anchor.plusMonths(months.toLong())
+        val days = ChronoUnit.DAYS.between(anchor, end).toInt()
+
+        return DateSpan(
+            years = years,
+            months = months,
+            days = days,
+            totalDays = ChronoUnit.DAYS.between(start, end),
+            totalWeeks = ChronoUnit.WEEKS.between(start, end),
+            totalMonths = ChronoUnit.MONTHS.between(start, end),
+            forward = forward
+        )
+    }
+
+    /** Moves a date by whole days, weeks, months or years. */
+    data class DateShift(
+        val date: LocalDate,
+        val dayOfWeek: String,
+        val daysInMonth: Int
+    )
+
+    fun shiftDate(
+        from: LocalDate,
+        days: Long = 0,
+        weeks: Long = 0,
+        months: Long = 0,
+        years: Long = 0
+    ): DateShift {
+        val moved = from
+            .plusDays(days + weeks * 7)
+            .plusMonths(months)
+            .plusYears(years)
+        return DateShift(
+            date = moved,
+            dayOfWeek = moved.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.ENGLISH),
+            daysInMonth = moved.lengthOfMonth()
         )
     }
 

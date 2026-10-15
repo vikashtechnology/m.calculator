@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Cake
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
@@ -56,6 +57,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -128,7 +130,10 @@ private val AdSlotGap = 6.dp
 fun AppRoot(
     viewModel: CalculatorViewModel,
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
-    onThemeModeChange: (AppThemeMode) -> Unit = {}
+    onThemeModeChange: (AppThemeMode) -> Unit = {},
+    /** Text handed over by another app through the share sheet, if any. */
+    sharedText: String? = null,
+    onSharedHandled: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
@@ -136,6 +141,9 @@ fun AppRoot(
     var menuOpen by remember { mutableStateOf(false) }
     var aiOpen by remember { mutableStateOf(false) }
     var toolOpen by remember { mutableStateOf<EverydayTool?>(null) }
+    var settingsOpen by remember { mutableStateOf(false) }
+    // A shared sentence is a question for Ask AI; a shared sum is for the pad.
+    var aiSeed by remember { mutableStateOf<String?>(null) }
     // Anonymous usage counts feed the admin dashboard; the switch can turn
     // them off, and nothing is sent while it is off.
     var statsOn by remember { mutableStateOf(Telemetry.isEnabled(context)) }
@@ -143,6 +151,23 @@ fun AppRoot(
     val scope = rememberCoroutineScope()
     val showMessage: (String) -> Unit = { message ->
         scope.launch { snackbarHostState.showSnackbar(message) }
+    }
+
+    // Something arrived from the share sheet: the pad takes it when it is a
+    // calculation, Ask AI takes it otherwise.
+    LaunchedEffect(sharedText) {
+        val text = sharedText ?: return@LaunchedEffect
+        onSharedHandled()
+        if (viewModel.acceptShared(text)) {
+            tab = AppTab.CALC
+            toolOpen = null
+            showMessage("Calculated from what you shared")
+        } else {
+            aiSeed = text.trim()
+            tab = AppTab.CALC
+            toolOpen = null
+            aiOpen = true
+        }
     }
 
     // Back closes the drop-down first, then returns to the calculator.
@@ -209,8 +234,12 @@ fun AppRoot(
                         // Ask AI is a chat: type, photograph or attach, and the
                         // answer comes back as a message. No memory by design.
                         AiChatScreen(
-                            onClose = { aiOpen = false },
-                            showMessage = showMessage
+                            onClose = {
+                                aiOpen = false
+                                aiSeed = null
+                            },
+                            showMessage = showMessage,
+                            initialQuestion = aiSeed
                         )
                     } else if (toolOpen != null) {
                         ToolsScreen(
@@ -307,6 +336,15 @@ fun AppRoot(
                         null
                     },
                     onClose = { menuOpen = false }
+                )
+            }
+
+            // Above the menu so the choices are visible while they are changed.
+            if (settingsOpen) {
+                SettingsSheet(
+                    settings = viewModel.settings,
+                    onChange = { viewModel.updateSettings(it) },
+                    onDismiss = { settingsOpen = false }
                 )
             }
         }
@@ -474,6 +512,17 @@ private fun DropDownMenuPanel(
                 }
             }
 
+            // --- settings ----------------------------------------------------
+            TextButton(onClick = {
+                settingsOpen = true
+                menuOpen = false
+            }) {
+                Text(
+                    text = "Settings — digits shown, digit grouping, key feedback",
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+
             // --- appearance --------------------------------------------------
             Text(
                 text = "Appearance",
@@ -581,6 +630,7 @@ private fun toolIcon(tool: EverydayTool): ImageVector = when (tool) {
     EverydayTool.ALGEBRA -> Icons.Filled.Functions
     EverydayTool.BASES -> Icons.Filled.Numbers
     EverydayTool.AGE -> Icons.Filled.Cake
+    EverydayTool.DATE -> Icons.Filled.DateRange
 }
 
 /** One row-shaped entry: icon beside a label, highlighted when active. */

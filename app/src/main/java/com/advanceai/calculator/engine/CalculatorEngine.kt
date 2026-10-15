@@ -10,7 +10,12 @@ object CalculatorEngine {
         if (input.isBlank()) return EngineResult.Err("Nothing to calculate")
         return try {
             val value = valueOf(input, ctx)
-            EngineResult.Ok(value, Formatter.value(value, if (ctx.polarMode) ctx.angleMode else null))
+            val text = Formatter.value(
+                value,
+                if (ctx.polarMode) ctx.angleMode else null,
+                ctx.display
+            )
+            EngineResult.Ok(value, text)
         } catch (e: MathError) {
             EngineResult.Err(e.message ?: "Math error", e.position)
         } catch (e: StackOverflowError) {

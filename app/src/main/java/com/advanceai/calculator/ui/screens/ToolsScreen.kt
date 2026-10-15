@@ -47,7 +47,8 @@ enum class EverydayTool(val label: String, val title: String) {
     PROFIT("Profit", "Profit, loss and margin"),
     ALGEBRA("Algebra", "Quadratic, primes and factors"),
     BASES("Bases", "Number base converter"),
-    AGE("Age", "Age calculator")
+    AGE("Age", "Age calculator"),
+    DATE("Date", "Days between dates")
 }
 
 @Composable
@@ -96,6 +97,7 @@ fun ToolsScreen(
                 EverydayTool.ALGEBRA -> AlgebraTool()
                 EverydayTool.BASES -> BasesTool()
                 EverydayTool.AGE -> AgeTool()
+                EverydayTool.DATE -> DateTool()
             }
             Text(
                 text = "Results update as you type. Currency values are plain numbers, " +
@@ -761,6 +763,102 @@ private fun BasesTool() {
 }
 
 // ---- Age ---------------------------------------------------------------------
+
+@Composable
+private fun DateTool() {
+    val today = remember { LocalDate.now() }
+    var from by remember { mutableStateOf("") }
+    var to by remember { mutableStateOf("") }
+    var shiftDays by remember { mutableStateOf("") }
+    var shiftMonths by remember { mutableStateOf("") }
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        OutlinedTextField(
+            value = from,
+            onValueChange = { from = it },
+            label = { Text("From date (blank = today)") },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
+            modifier = Modifier.fillMaxWidth()
+        )
+        OutlinedTextField(
+            value = to,
+            onValueChange = { to = it },
+            label = { Text("To date (blank = today)") },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        val start = if (from.isBlank()) today else runCatching { Everyday.parseDate(from) }.getOrNull()
+        val end = if (to.isBlank()) today else runCatching { Everyday.parseDate(to) }.getOrNull()
+        when {
+            from.isNotBlank() && start == null -> ErrorText("The 'from' date is not valid")
+            to.isNotBlank() && end == null -> ErrorText("The 'to' date is not valid")
+            start != null && end != null -> {
+                val span = Everyday.daysBetween(start, end)
+                val direction = if (span.forward) "after" else "before"
+                ResultCard {
+                    ResultRow(
+                        "From ${start} to ${end}",
+                        "${span.years} years ${span.months} months ${span.days} days",
+                        emphasis = true
+                    )
+                    ResultRow("Total days", "${span.totalDays}")
+                    ResultRow("Total weeks", "${span.totalWeeks}")
+                    ResultRow("Total months", "${span.totalMonths}")
+                    ResultRow(
+                        "Either date is",
+                        "${span.totalDays} day${if (span.totalDays == 1L) "" else "s"} $direction the other"
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = "Add or subtract time",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberInput(
+                value = shiftDays,
+                label = "Days",
+                onValueChange = { shiftDays = it },
+                modifier = Modifier.weight(1f)
+            )
+            NumberInput(
+                value = shiftMonths,
+                label = "Months",
+                onValueChange = { shiftMonths = it },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        val base = start ?: today
+        val days = shiftDays.toLongOrNull() ?: 0L
+        val months = shiftMonths.toLongOrNull() ?: 0L
+        if (days != 0L || months != 0L) {
+            runCatching { Everyday.shiftDate(base, days = days, months = months) }.fold(
+                onSuccess = { moved ->
+                    ResultCard {
+                        ResultRow("${days} days and ${months} months from $base", "${moved.date}", emphasis = true)
+                        ResultRow("That is a", moved.dayOfWeek)
+                        ResultRow("Days in that month", "${moved.daysInMonth}")
+                    }
+                },
+                onFailure = { ErrorText(it.message) }
+            )
+        } else {
+            Text(
+                text = "Enter days (negative to go back) or months above, and the resulting " +
+                    "date appears here.",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
 @Composable
 private fun AgeTool() {

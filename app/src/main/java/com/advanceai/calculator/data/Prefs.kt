@@ -3,6 +3,7 @@ package com.advanceai.calculator.data
 import android.content.Context
 import androidx.core.content.edit
 import com.advanceai.calculator.engine.AngleMode
+import com.advanceai.calculator.engine.DisplayOptions
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -17,6 +18,17 @@ enum class AppThemeMode(val label: String) {
             entries.firstOrNull { it.name == value } ?: SYSTEM
     }
 }
+
+/**
+ * What the Settings sheet edits. Held as one value so the UI can show the
+ * current choices without reading each preference separately.
+ */
+data class AppSettings(
+    val digits: Int = DisplayOptions.DEFAULT.significantDigits,
+    val indianGrouping: Boolean = false,
+    val haptics: Boolean = true,
+    val keySound: Boolean = false
+)
 
 data class HistoryEntry(
     val expression: String,
@@ -53,9 +65,40 @@ class Prefs(context: Context) {
         get() = sp.getString(KEY_LAST_RESULT, "") ?: ""
         set(value) = sp.edit { putString(KEY_LAST_RESULT, value) }
 
+    /** Significant digits shown in results: one of [DisplayOptions.DIGIT_CHOICES]. */
     var precision: Int
-        get() = sp.getInt(KEY_PRECISION, 12)
-        set(value) = sp.edit { putInt(KEY_PRECISION, value) }
+        get() = sp.getInt(KEY_PRECISION, DisplayOptions.DEFAULT.significantDigits)
+        set(value) = sp.edit { putInt(KEY_PRECISION, value.coerceIn(1, 15)) }
+
+    /** Indian digit grouping, so 1234567 reads 12,34,567. */
+    var indianGrouping: Boolean
+        get() = sp.getBoolean(KEY_GROUPING, false)
+        set(value) = sp.edit { putBoolean(KEY_GROUPING, value) }
+
+    /** A short knock on every key press. */
+    var haptics: Boolean
+        get() = sp.getBoolean(KEY_HAPTICS, true)
+        set(value) = sp.edit { putBoolean(KEY_HAPTICS, value) }
+
+    /** The system click sound on every key press. Off unless asked for. */
+    var keySound: Boolean
+        get() = sp.getBoolean(KEY_KEY_SOUND, false)
+        set(value) = sp.edit { putBoolean(KEY_KEY_SOUND, value) }
+
+    /** Everything the Settings sheet edits, read in one go. */
+    fun settings(): AppSettings = AppSettings(
+        digits = precision,
+        indianGrouping = indianGrouping,
+        haptics = haptics,
+        keySound = keySound
+    )
+
+    fun save(settings: AppSettings) {
+        precision = settings.digits
+        indianGrouping = settings.indianGrouping
+        haptics = settings.haptics
+        keySound = settings.keySound
+    }
 
     /** System / Light / Dark — see [AppThemeMode]. */
     var themeMode: AppThemeMode
@@ -123,6 +166,9 @@ class Prefs(context: Context) {
         const val KEY_VARIABLES = "variables"
         const val KEY_HISTORY = "history"
         const val KEY_PRECISION = "precision"
+        const val KEY_GROUPING = "indian_grouping"
+        const val KEY_HAPTICS = "haptics"
+        const val KEY_KEY_SOUND = "key_sound"
         const val KEY_THEME = "theme_mode"
         const val MAX_HISTORY = 200
     }

@@ -232,6 +232,49 @@ class EverydayTest {
     }
 
     @Test
+    fun daysBetweenDatesCrossesLeapDay() {
+        // 2024-02-28 to 2024-03-01 includes the leap day: two days.
+        val span = Everyday.daysBetween(LocalDate.of(2024, 2, 28), LocalDate.of(2024, 3, 1))
+        assertEquals(2L, span.totalDays)
+        assertEquals(0, span.years)
+        assertEquals(0, span.months)
+        assertEquals(2, span.days)
+        assertTrue(span.forward)
+    }
+
+    @Test
+    fun daysBetweenDatesCountsBackwards() {
+        val span = Everyday.daysBetween(LocalDate.of(2026, 10, 11), LocalDate.of(1998, 8, 15))
+        assertEquals(10_284L, span.totalDays)
+        assertEquals(28, span.years)
+        assertEquals(1, span.months)
+        assertEquals(26, span.days)
+        assertFalse(span.forward)
+        // Counted either way round, the distance is the same.
+        assertEquals(
+            Everyday.daysBetween(LocalDate.of(1998, 8, 15), LocalDate.of(2026, 10, 11)).totalDays,
+            span.totalDays
+        )
+    }
+
+    @Test
+    fun shiftingDatesHandlesMonthEnds() {
+        // 31 January plus one month has to land on the end of February.
+        assertEquals(
+            LocalDate.of(2024, 2, 29),
+            Everyday.shiftDate(LocalDate.of(2024, 1, 31), months = 1).date
+        )
+        assertEquals(
+            LocalDate.of(2026, 10, 1),
+            Everyday.shiftDate(LocalDate.of(2026, 10, 11), days = -10).date
+        )
+        val shifted = Everyday.shiftDate(LocalDate.of(2026, 10, 15), weeks = 2)
+        assertEquals(LocalDate.of(2026, 10, 29), shifted.date)
+        assertEquals("Thursday", shifted.dayOfWeek)
+        assertEquals(31, shifted.daysInMonth)
+    }
+
+    @Test
     fun dateParsing() {
         assertEquals(LocalDate.of(1998, 8, 15), Everyday.parseDate("15/08/1998"))
         assertEquals(LocalDate.of(1998, 8, 15), Everyday.parseDate("15-08-1998"))

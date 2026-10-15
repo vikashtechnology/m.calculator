@@ -48,6 +48,13 @@ keypad no longer shares the screen with a bottom tab bar.
 * History of the last 200 calculations, tap to reuse, long press to reuse the result
 * Every key documents itself: long press it
 * Swipe-free editing: tap anywhere in the expression to place the cursor
+* Copy or **share** a result straight into any other app
+* **Share a sum to the app** from anywhere (WhatsApp, a note, a browser): the pad
+  calculates it, and a shared question goes to Ask AI instead. A `calc:2+3` link
+  does the same from a browser
+* **Settings** (drop-down menu): digits shown (8/10/12/15), Indian digit grouping
+  (12,34,567), and the key feedback — a short knock on every press, plus an
+  optional click sound
 
 ### Functions (≈90)
 | Group | Examples |
@@ -100,6 +107,7 @@ between them. Every field recalculates as you type — there is no Solve button.
 | **Algebra** | Quadratic roots (including complex), discriminant and vertex, primes, prime factorisation |
 | **Bases** | Convert between binary, octal, decimal, hex and any base from 2 to 36 |
 | **Age** | Age in years/months/days plus total days/weeks/months and days to the next birthday |
+| **Date** | Days/weeks/months/years between two dates, and "add or subtract days or months" |
 
 ### Ask AI (bring your own key — nothing to sign up for)
 The **Ask AI** icon in the readout's toolbar (beside the history button) opens

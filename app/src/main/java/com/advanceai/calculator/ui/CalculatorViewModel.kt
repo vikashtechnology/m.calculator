@@ -7,10 +7,12 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import com.advanceai.calculator.data.HistoryEntry
 import com.advanceai.calculator.ai.GeminiClient
+import com.advanceai.calculator.data.AppSettings
 import com.advanceai.calculator.data.Prefs
 import com.advanceai.calculator.data.Telemetry
 import com.advanceai.calculator.engine.AngleMode
 import com.advanceai.calculator.engine.CalculatorEngine
+import com.advanceai.calculator.engine.DisplayOptions
 import com.advanceai.calculator.engine.Calculus
 import com.advanceai.calculator.engine.EngineResult
 import com.advanceai.calculator.engine.Formatter
@@ -128,6 +130,22 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
         Telemetry.record(app, Telemetry.EVENT_APP_OPEN)
     }
 
+    /**
+     * The settings the Settings sheet edits. Held here so a change repaints the
+     * affected screens at once (the digits shown, the key feedback).
+     */
+    var settings by mutableStateOf(prefs.settings())
+        private set
+
+    fun updateSettings(updated: AppSettings) {
+        prefs.save(updated)
+        settings = updated
+    }
+
+    /** What the engine prints with: digits shown and digit grouping. */
+    private fun displayOptions(): DisplayOptions =
+        DisplayOptions(settings.digits, settings.indianGrouping)
+
     var ui by mutableStateOf(
         CalcUiState(
             angleMode = prefs.angleMode,
@@ -180,6 +198,29 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
             }
             KeyAction.OpenHistory -> Unit // handled by the UI
         }
+    }
+
+    /**
+     * Takes text shared into the app from another app (a sum picked out of a
+     * chat, say). Returns true when it was a calculation this engine could do:
+     * the pad shows it with the answer. Returns false for anything else, and
+     * the caller hands it to Ask AI instead.
+     */
+    fun acceptShared(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return false
+        // "1,234 + 5" and "12 34" are how people write numbers; the lexer wants
+        // them plain. Letters are left alone: those belong to Ask AI.
+        val cleaned = if (trimmed.any { it.isLetter() }) {
+            trimmed
+        } else {
+            trimmed.filterNot { it == ',' || it == ' ' }
+        }
+        val outcome = CalculatorEngine.evaluate(cleaned, buildContext())
+        if (outcome !is EngineResult.Ok) return false
+        ui = ui.copy(expression = cleaned, cursor = cleaned.length)
+        evaluate()
+        return true
     }
 
     fun onLongPress(key: CalcKey) {
@@ -456,7 +497,8 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
             angleMode = ui.angleMode,
             variables = variablesAsValues(),
             ans = ui.ans,
-            polarMode = ui.polar
+            polarMode = ui.polar,
+            display = displayOptions()
         )
         if (ui.memory != 0.0) ctx.setVariable("m", ui.memory)
         return ctx
@@ -601,7 +643,7 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
                         s.copy(error = "No real solution found", result = "", detail = "")
                     } else {
                         s.copy(
-                            result = roots.joinToString(", ") { Formatter.number(it) },
+                            result = roots.joinToString(", ") { Formatter.number(it, display = displayOptions()) },
                             detail = "Found ${roots.size} solution${if (roots.size == 1) "" else "s"}",
                             error = null
                         )
@@ -612,8 +654,8 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
                     val value = Calculus.derivative(expr, s.variable, at, ctx)
                     val second = Calculus.secondDerivative(expr, s.variable, at, ctx)
                     solver = s.copy(
-                        result = Formatter.number(value),
-                        detail = "at ${s.variable} = ${s.point}   •   second derivative ${Formatter.number(second)}",
+                        result = Formatter.number(value, display = displayOptions()),
+                        detail = "at ${s.variable} = ${s.point}   •   second derivative ${Formatter.number(second, display = displayOptions())}",
                         error = null
                     )
                 }
@@ -622,7 +664,7 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
                     val b = s.upper.toDoubleOrNull() ?: return
                     val value = Calculus.integrate(expr, s.variable, a, b, ctx)
                     solver = s.copy(
-                        result = Formatter.number(value),
+                        result = Formatter.number(value, display = displayOptions()),
                         detail = "∫ from ${s.lower} to ${s.upper}",
                         error = null
                     )
@@ -632,7 +674,7 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
                     val b = s.upper.toDoubleOrNull() ?: return
                     val value = Calculus.series(expr, s.variable, a, b, ctx)
                     solver = s.copy(
-                        result = Formatter.number(value),
+                        result = Formatter.number(value, display = displayOptions()),
                         detail = "Σ from ${s.lower} to ${s.upper}",
                         error = null
                     )
@@ -642,7 +684,7 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
                     val b = s.upper.toDoubleOrNull() ?: return
                     val value = Calculus.series(expr, s.variable, a, b, ctx, product = true)
                     solver = s.copy(
-                        result = Formatter.number(value),
+                        result = Formatter.number(value, display = displayOptions()),
                         detail = "Π from ${s.lower} to ${s.upper}",
                         error = null
                     )
@@ -761,7 +803,7 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
         val from = Units.find(converter.fromId) ?: return ""
         val to = Units.find(converter.toId) ?: return ""
         val value = converter.input.trim().toDoubleOrNull() ?: return ""
-        return Formatter.number(Units.convert(value, from, to))
+        return Formatter.number(Units.convert(value, from, to), display = displayOptions())
     }
 
     fun solveFreeTextConversion() {
@@ -773,7 +815,7 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
                 category = request.from.category,
                 fromId = request.from.id,
                 toId = request.to.id,
-                input = Formatter.number(request.value)
+                input = Formatter.number(request.value, display = displayOptions())
             )
         }
     }

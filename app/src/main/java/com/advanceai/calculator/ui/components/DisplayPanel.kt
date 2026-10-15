@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Backspace
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,6 +64,7 @@ fun DisplayPanel(
     onHistory: () -> Unit,
     onOpenAi: () -> Unit,
     onCopy: () -> Unit,
+    onShare: () -> Unit,
     onClearEntry: () -> Unit,
     onHint: () -> Unit,
     modifier: Modifier = Modifier
@@ -282,6 +284,14 @@ fun DisplayPanel(
                     Icon(
                         imageVector = Icons.Filled.ContentCopy,
                         contentDescription = "Copy result",
+                        tint = colors.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                IconButton(onClick = onShare) {
+                    Icon(
+                        imageVector = Icons.Filled.Share,
+                        contentDescription = "Share the result",
                         tint = colors.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )

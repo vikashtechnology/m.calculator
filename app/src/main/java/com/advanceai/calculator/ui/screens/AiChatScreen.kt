@@ -91,7 +91,9 @@ import java.io.File
 fun AiChatScreen(
     onClose: () -> Unit,
     showMessage: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** A question that arrived from elsewhere (the share sheet) or null. */
+    initialQuestion: String? = null
 ) {
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -105,6 +107,12 @@ fun AiChatScreen(
     var preview by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     var settingsOpen by remember { mutableStateOf(!GeminiClient.hasKey) }
     var pendingPhoto by remember { mutableStateOf<Uri?>(null) }
+
+    // Something was shared with the app that is not a calculation: it lands in
+    // the box, ready to send.
+    LaunchedEffect(initialQuestion) {
+        if (!initialQuestion.isNullOrBlank()) draft = initialQuestion
+    }
 
     BackHandler { onClose() }
 

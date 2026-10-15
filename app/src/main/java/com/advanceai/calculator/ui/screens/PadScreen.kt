@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.advanceai.calculator.ui.CalcKey
@@ -43,6 +44,8 @@ import com.advanceai.calculator.ui.components.KeypadGap
 import com.advanceai.calculator.ui.components.KeypadIdealKeyHeight
 import com.advanceai.calculator.ui.components.KeypadMinKeyHeight
 import com.advanceai.calculator.ui.components.keypadHeightFor
+import com.advanceai.calculator.ui.components.rememberKeyFeedback
+import com.advanceai.calculator.ui.shareText
 
 /**
  * Room the readout keeps for itself however tall the keys would like to be.
@@ -67,6 +70,21 @@ fun PadScreen(
 ) {
     val state = viewModel.ui
     val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    // What the display is worth sharing: the sum with its answer, or the
+    // number alone when the expression has been cleared.
+    fun payload(): String {
+        val result = state.resultText.replace(",", "")
+        return when {
+            state.expression.isNotBlank() && result.isNotBlank() -> "${state.expression} = $result"
+            result.isNotBlank() -> result
+            else -> state.expression
+        }
+    }
+    val feedback = rememberKeyFeedback(
+        haptics = viewModel.settings.haptics,
+        sound = viewModel.settings.keySound
+    )
     var showHistory by remember { mutableStateOf(false) }
     var showHelp by remember { mutableStateOf(false) }
 
@@ -107,12 +125,13 @@ fun PadScreen(
                     onHistory = { showHistory = true },
                     onOpenAi = onOpenAi,
                     onCopy = {
-                        val text = state.resultText.ifEmpty { state.expression }
+                        val text = payload().replace(",", "")
                         if (text.isNotEmpty()) {
                             clipboard.setText(AnnotatedString(text))
                             showMessage("Copied $text")
                         }
                     },
+                    onShare = { shareText(context, payload()) },
                     onClearEntry = { viewModel.clearAll() },
                     onHint = { showHelp = true }
                 )
@@ -162,6 +181,7 @@ fun PadScreen(
                     }
                 },
                 keyHeight = keyHeight,
+                feedback = feedback,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 6.dp)

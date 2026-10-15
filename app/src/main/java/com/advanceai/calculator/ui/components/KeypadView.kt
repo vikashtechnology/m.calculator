@@ -59,6 +59,8 @@ fun Keypad(
     onKey: (CalcKey) -> Unit,
     onLongPressKey: (CalcKey) -> Unit,
     keyHeight: Dp = KeypadIdealKeyHeight,
+    /** The knock (and optional click) a press makes; see rememberKeyFeedback. */
+    feedback: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val rows = Keypads.keysFor(page)
@@ -77,8 +79,14 @@ fun Keypad(
                     KeyButton(
                         key = key,
                         second = second,
-                        onClick = { onKey(key) },
-                        onLongClick = { onLongPressKey(key) },
+                        onClick = {
+                            feedback()
+                            onKey(key)
+                        },
+                        onLongClick = {
+                            feedback()
+                            onLongPressKey(key)
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()

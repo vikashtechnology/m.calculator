@@ -17,7 +17,11 @@ object Formatter {
     private const val LARGE_THRESHOLD = 1e15
     private const val SMALL_THRESHOLD = 1e-9
 
-    fun number(x: Double, polarAngleMode: AngleMode? = null): String {
+    fun number(
+        x: Double,
+        polarAngleMode: AngleMode? = null,
+        display: DisplayOptions = DisplayOptions.DEFAULT
+    ): String {
         if (x.isNaN()) return "Undefined"
         if (x.isInfinite()) return if (x > 0) "∞" else "-∞"
         if (x == 0.0) return "0"
@@ -26,14 +30,42 @@ object Formatter {
         if (ax >= LARGE_THRESHOLD || ax < SMALL_THRESHOLD) {
             return scientific(x)
         }
-        val rounded = BigDecimal(x).round(MathContext(SIGNIFICANT_DIGITS, RoundingMode.HALF_UP))
+        val digits = display.significantDigits.coerceIn(1, 15)
+        val rounded = BigDecimal(x).round(MathContext(digits, RoundingMode.HALF_UP))
         val plain = rounded.stripTrailingZeros()
         val text = if (plain.scale() <= 0) {
             plain.toBigInteger().toString()
         } else {
             plain.toPlainString()
         }
-        return if (text == "-0") "0" else text
+        val plainText = if (text == "-0") "0" else text
+        return group(plainText, display.indianGrouping)
+    }
+
+    /** True for the digits-and-separators text the grouping helper accepts. */
+    private val GROUPABLE = Regex("^[+-]?\\d+(\\.\\d+)?$")
+
+    /**
+     * Adds thousands separators — either the Western 1,234,567 or the Indian
+     * 12,34,567, where only the last three digits form a group of three and the
+     * rest pair up.
+     */
+    fun group(text: String, indian: Boolean = false): String {
+        if (!GROUPABLE.matches(text)) return text
+        val negative = text.startsWith("-")
+        val body = text.removePrefix("-").removePrefix("+")
+        val dot = body.indexOf('.')
+        val whole = if (dot < 0) body else body.substring(0, dot)
+        val rest = if (dot < 0) "" else body.substring(dot)
+        if (whole.length <= 3) return text
+        val tail = whole.takeLast(3)
+        val head = whole.dropLast(3)
+        val groupedHead = if (indian) {
+            head.reversed().chunked(2).joinToString(",").reversed()
+        } else {
+            head.reversed().chunked(3).joinToString(",").reversed()
+        }
+        return (if (negative) "-" else "") + groupedHead + "," + tail + rest
     }
 
     private fun scientific(x: Double): String {
@@ -46,11 +78,15 @@ object Formatter {
         return "${mantissa}e${exponent}"
     }
 
-    fun value(v: Value, polarAngleMode: AngleMode? = null): String = when (v) {
+    fun value(
+        v: Value,
+        polarAngleMode: AngleMode? = null,
+        display: DisplayOptions = DisplayOptions.DEFAULT
+    ): String = when (v) {
         is Num -> if (v.isRealScalar || isNegligible(v.im, v.re)) {
-            number(v.re)
+            number(v.re, display = display)
         } else {
-            complex(v, polarAngleMode)
+            complex(v, polarAngleMode, display)
         }
         is Mat -> v.displayString()
     }
@@ -62,15 +98,19 @@ object Formatter {
     private fun isNegligible(part: Double, other: Double): Boolean =
         Math.abs(part) <= 1e-13 * Math.max(1.0, Math.abs(other))
 
-    private fun complex(v: Num, polarAngleMode: AngleMode?): String {
+    private fun complex(
+        v: Num,
+        polarAngleMode: AngleMode?,
+        display: DisplayOptions = DisplayOptions.DEFAULT
+    ): String {
         if (polarAngleMode != null) {
             val angle = polarAngleMode.fromRadians(v.arg)
-            return "${number(v.abs)} ∠ ${number(angle)}°"
+            return "${number(v.abs, display = display)} ∠ ${number(angle, display = display)}°"
         }
         val realPart = if (isNegligible(v.re, v.im)) 0.0 else v.re
         val imagPart = if (isNegligible(v.im, v.re)) 0.0 else v.im
-        val re = number(realPart)
-        val imAbs = number(Math.abs(imagPart))
+        val re = number(realPart, display = display)
+        val imAbs = number(Math.abs(imagPart), display = display)
         return when {
             realPart == 0.0 -> if (imagPart < 0) "-${imAbs}i" else "${imAbs}i"
             imagPart < 0 -> "$re - ${imAbs}i"
@@ -136,8 +176,12 @@ object Formatter {
     }
 
     /** Formats a value for the history list, keeping it on one line. */
-    fun compact(v: Value): String = when (v) {
-        is Num -> if (v.isRealScalar) number(v.re) else complex(v, null).replace(" ", "")
+    fun compact(v: Value, display: DisplayOptions = DisplayOptions.DEFAULT): String = when (v) {
+        is Num -> if (v.isRealScalar) {
+            number(v.re, display = display)
+        } else {
+            complex(v, null, display).replace(" ", "")
+        }
         is Mat -> v.displayString()
     }
 }
