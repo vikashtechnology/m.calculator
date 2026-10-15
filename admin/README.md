@@ -3,6 +3,10 @@
 A read-only dashboard for AI Calculator: installs, active users, and calculations
 and AI questions per day, with a per-day table and a chart.
 
+The dashboard also edits the text of the app's **About page**: `GET /v1/about`
+is public (the app fetches it and keeps a copy for offline), `PUT /v1/about`
+needs the admin token. See WEB_SETUP.md.
+
 The Worker also ships an **optional** `/v1/solve` endpoint that holds the AI
 key server-side and checks a Google sign-in — the app does not call it (Ask AI
 runs on the key the *user* pastes in), so leave those two secrets unset and the

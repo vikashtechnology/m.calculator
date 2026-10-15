@@ -29,3 +29,12 @@ CREATE TABLE IF NOT EXISTS installs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_installs_day ON installs (first_day);
+
+-- The About page the app shows, as one JSON row. The admin dashboard writes it
+-- through PUT /v1/about, so the wording and links can change without shipping a
+-- new APK. Empty means the Worker's built-in default text is served.
+CREATE TABLE IF NOT EXISTS about (
+  id      TEXT PRIMARY KEY,   -- always "about"
+  json    TEXT NOT NULL,      -- { title, tagline, body[], links[], contact }
+  updated INTEGER NOT NULL
+);

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
@@ -46,9 +47,13 @@ fun MatrixScreen(
 ) {
     val state = viewModel.matrix
 
+    // Scrolls as a whole: the inputs, the matrix cells and the result below
+    // them together are taller than a small phone, and anything past the bottom
+    // edge used to be unreachable.
     Column(
         modifier = modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 14.dp)
     ) {
         Row(

@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -157,6 +158,8 @@ private fun ResultRow(label: String, value: String, emphasis: Boolean = false) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
+        // Half the row each, value right-aligned: a long number wraps onto a
+        // second line rather than being pushed off the edge by its label.
         Text(
             text = value,
             style = if (emphasis) {
@@ -168,7 +171,9 @@ private fun ResultRow(label: String, value: String, emphasis: Boolean = false) {
             } else {
                 MaterialTheme.typography.titleMedium.copy(fontFamily = FontFamily.Monospace)
             },
-            color = if (emphasis) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            color = if (emphasis) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f)
         )
     }
 }

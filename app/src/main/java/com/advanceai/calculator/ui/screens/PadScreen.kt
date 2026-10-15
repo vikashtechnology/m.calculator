@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -122,7 +123,17 @@ fun PadScreen(
         val keypadHeight = minOf(idealKeypad, roomForKeypad)
         val keyHeight = (keypadHeight - KeypadGap * (keyRows - 1)) / keyRows
 
-        Column(modifier = Modifier.fillMaxSize()) {
+        // Held sideways, or in split screen, even the smallest keypad plus a
+        // usable readout does not fit. Rather than squashing either, the whole
+        // pad scrolls, so every control stays reachable.
+        val scrolls = maxHeight <
+            ReadoutMinHeight + ChipsRowHeight + KeypadOuterPadding + smallestKeypad
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(if (scrolls) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+        ) {
             // The readout sits on its own raised card, which gives the pad depth.
             // Ask AI is an icon in its toolbar now (next to history); the card takes
             // every dp the fixed keypad does not need.
@@ -133,7 +144,16 @@ fun PadScreen(
                 tonalElevation = 2.dp,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .then(
+                        // A weight needs a bounded height, and a scrolling
+                        // column has none — so the readout asks for its minimum
+                        // when the pad scrolls.
+                        if (scrolls) {
+                            Modifier.height(ReadoutMinHeight)
+                        } else {
+                            Modifier.weight(1f)
+                        }
+                    )
                     .padding(horizontal = 10.dp, vertical = 4.dp)
             ) {
                 DisplayPanel(

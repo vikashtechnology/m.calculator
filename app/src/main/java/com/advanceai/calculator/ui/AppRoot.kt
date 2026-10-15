@@ -11,6 +11,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -39,6 +42,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Functions
 import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Numbers
@@ -69,13 +73,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.advanceai.calculator.ads.AdBanner
 import com.advanceai.calculator.ads.Ads
 import com.advanceai.calculator.ads.activityOrNull
+import com.advanceai.calculator.ui.HelpSheet
+import com.advanceai.calculator.ui.components.AdSlotStrip
 import com.advanceai.calculator.ui.components.AiHeroMenuRow
 import com.advanceai.calculator.ui.theme.appChipColors
+import com.advanceai.calculator.ui.screens.AboutScreen
 import com.advanceai.calculator.ui.screens.AiChatScreen
 import com.advanceai.calculator.ui.screens.ConverterScreen
 import com.advanceai.calculator.ui.screens.GraphScreen
@@ -142,6 +150,9 @@ fun AppRoot(
     var aiOpen by remember { mutableStateOf(false) }
     var toolOpen by remember { mutableStateOf<EverydayTool?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
+    var aboutOpen by remember { mutableStateOf(false) }
+    // The tip strip in the ad slot opens the same help the lightbulb does.
+    var helpOpen by remember { mutableStateOf(false) }
     // A shared sentence is a question for Ask AI; a shared sum is for the pad.
     var aiSeed by remember { mutableStateOf<String?>(null) }
     // Anonymous usage counts feed the admin dashboard; the switch can turn
@@ -172,9 +183,13 @@ fun AppRoot(
 
     // Back closes the drop-down first, then returns to the calculator.
     // While Ask AI is open its own screen owns the back gesture.
-    BackHandler(enabled = menuOpen || toolOpen != null || (!aiOpen && tab != AppTab.CALC)) {
+    BackHandler(
+        enabled = menuOpen || toolOpen != null || aboutOpen ||
+            (!aiOpen && tab != AppTab.CALC)
+    ) {
         when {
             menuOpen -> menuOpen = false
+            aboutOpen -> aboutOpen = false
             toolOpen != null -> toolOpen = null
             else -> tab = AppTab.CALC
         }
@@ -183,7 +198,9 @@ fun AppRoot(
     val activity = remember(context) { context.activityOrNull() }
     // Ads need an activity for the consent form and the ad itself; without one
     // (a preview, for instance) the app runs exactly as it did before.
-    val adsPossible = activity != null && !aiOpen
+    // Ads run on every screen, Ask AI included; the only thing that stops them
+    // is having no window to show the consent form in.
+    val adsPossible = activity != null
 
     Box(
         modifier = Modifier
@@ -223,13 +240,17 @@ fun AppRoot(
                 // bar steps aside while it is open.
                 if (!aiOpen) {
                     // Explicitly typed so the compiler sees a plain lambda.
-                    val closeTool: (() -> Unit)? = if (toolOpen == null) {
-                        null
-                    } else {
-                        { toolOpen = null }
+                    val closeTool: (() -> Unit)? = when {
+                        aboutOpen -> {
+                            { aboutOpen = false }
+                        }
+                        toolOpen == null -> null
+                        else -> {
+                            { toolOpen = null }
+                        }
                     }
                     TopBar(
-                        title = toolOpen?.title ?: tab.label,
+                        title = if (aboutOpen) "About" else toolOpen?.title ?: tab.label,
                         onMenuClick = { menuOpen = !menuOpen },
                         onBack = closeTool
                     )
@@ -242,7 +263,9 @@ fun AppRoot(
                         .fillMaxWidth()
                         .weight(1f)
                 ) {
-                    if (aiOpen) {
+                    if (aboutOpen) {
+                        AboutScreen(showMessage = showMessage)
+                    } else if (aiOpen) {
                         // Ask AI is a chat: type, photograph or attach, and the
                         // answer comes back as a message. No memory by design.
                         AiChatScreen(
@@ -287,16 +310,21 @@ fun AppRoot(
                 // The AdMob banner, pinned under everything else. Its height is
                 // reserved from the first frame — the keys are laid out with
                 // this space already gone — so an ad appearing can never resize
-                // the keypad. If no ad arrives the slot simply stays empty.
+                // the keypad. Until an ad fills (or when none ever does), the
+                // same slot carries a tip strip, so the space is never a blank
+                // band and nothing has to move when the ad arrives.
                 if (showAdSlot) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = AdSlotGap)
+                            .padding(top = AdSlotGap, start = 8.dp, end = 8.dp)
                             .height(AdSlotHeight),
                         contentAlignment = Alignment.Center
                     ) {
                         AdBanner()
+                        if (!Ads.bannerLoaded) {
+                            AdSlotStrip(onOpenHelp = { helpOpen = true })
+                        }
                     }
                 }
             }
@@ -354,8 +382,21 @@ fun AppRoot(
                         menuOpen = false
                         settingsOpen = true
                     },
+                    onOpenAbout = {
+                        menuOpen = false
+                        aboutOpen = true
+                    },
+                    // Everything above the ad slot, minus the bar the panel
+                    // hangs from: the menu scrolls rather than running off the
+                    // bottom of a short screen.
+                    maxPanelHeight = (maxHeight - TopBarHeight - AdSlotHeight - AdSlotGap)
+                        .coerceAtLeast(240.dp),
                     onClose = { menuOpen = false }
                 )
+            }
+
+            if (helpOpen) {
+                HelpSheet(onDismiss = { helpOpen = false })
             }
 
             // Above the menu so the choices are visible while they are changed.
@@ -439,6 +480,9 @@ private fun DropDownMenuPanel(
     onThemeModeChange: (AppThemeMode) -> Unit,
     onPrivacyOptions: (() -> Unit)?,
     onOpenSettings: () -> Unit,
+    onOpenAbout: () -> Unit,
+    /** How much of the screen the panel may take before it scrolls. */
+    maxPanelHeight: Dp,
     onClose: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -453,7 +497,15 @@ private fun DropDownMenuPanel(
             .widthIn(max = 560.dp)
             .fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        // The whole menu scrolls inside the space above the ad slot: on a short
+        // screen the last rows (About, Settings, the stats switch) used to sit
+        // below the bottom edge with no way to reach them.
+        Column(
+            modifier = Modifier
+                .heightIn(max = maxPanelHeight)
+                .verticalScroll(rememberScrollState())
+                .padding(12.dp)
+        ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -481,8 +533,9 @@ private fun DropDownMenuPanel(
             }
 
             AiHeroMenuRow(onOpenAi = onOpenAi)
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
+            MenuSection("Tools")
             AppTab.entries.chunked(ItemsPerLine).forEach { line ->
                 Row(
                     modifier = Modifier
@@ -506,12 +559,7 @@ private fun DropDownMenuPanel(
             }
 
             // --- everyday calculators ---------------------------------------
-            Text(
-                text = "Everyday calculators",
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, top = 12.dp, bottom = 6.dp)
-            )
+            MenuSection("Everyday calculators")
             EverydayTool.entries.chunked(ToolsPerLine).forEach { line ->
                 Row(
                     modifier = Modifier
@@ -532,13 +580,20 @@ private fun DropDownMenuPanel(
                 }
             }
 
-            // --- settings ----------------------------------------------------
-            TextButton(onClick = onOpenSettings) {
-                Text(
-                    text = "Settings — digits shown, digit grouping, key feedback",
-                    style = MaterialTheme.typography.labelLarge
-                )
-            }
+            // --- the app itself ------------------------------------------------
+            MenuSection("App")
+            MenuRow(
+                icon = Icons.Filled.Tune,
+                title = "Settings",
+                detail = "Digits shown, digit grouping, key feedback, ads",
+                onClick = onOpenSettings
+            )
+            MenuRow(
+                icon = Icons.Filled.Info,
+                title = "About AI Calculator",
+                detail = "Version, links and what this app is",
+                onClick = onOpenAbout
+            )
 
             // --- appearance --------------------------------------------------
             Text(
@@ -564,6 +619,7 @@ private fun DropDownMenuPanel(
             // --- privacy ------------------------------------------------------
             // Only present where Google requires a way back into the consent
             // form (EEA/UK/Switzerland); nothing to show anywhere else.
+
             if (onPrivacyOptions != null) {
                 TextButton(onClick = onPrivacyOptions) {
                     Text(
@@ -648,6 +704,74 @@ private fun toolIcon(tool: EverydayTool): ImageVector = when (tool) {
     EverydayTool.BASES -> Icons.Filled.Numbers
     EverydayTool.AGE -> Icons.Filled.Cake
     EverydayTool.DATE -> Icons.Filled.DateRange
+}
+
+/** A heading that starts a group of rows in the drop-down. */
+@Composable
+private fun MenuSection(title: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, top = 14.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+/** A full-width row with an icon, a title and one line of explanation. */
+@Composable
+private fun MenuRow(
+    icon: ImageVector,
+    title: String,
+    detail: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    Surface(
+        onClick = onClick,
+        color = colors.surfaceContainer,
+        contentColor = colors.onSurface,
+        shape = RoundedCornerShape(12.dp),
+        tonalElevation = 1.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = colors.primary,
+                modifier = Modifier.size(18.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = title, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = colors.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
 }
 
 /** One row-shaped entry: icon beside a label, highlighted when active. */

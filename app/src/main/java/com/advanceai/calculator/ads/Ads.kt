@@ -67,6 +67,14 @@ object Ads {
         private set
 
     /**
+     * True once the banner has actually filled. The slot under the app keeps its
+     * height either way; when this is false the slot shows something useful
+     * instead of an empty strip (see `AdSlotStrip`).
+     */
+    var bannerLoaded by mutableStateOf(false)
+        private set
+
+    /**
      * Where the banner has got to, in a sentence. Shown in Settings so "are the
      * ads working?" can be answered on the phone instead of in a log, and
      * written to logcat under the `Ads` tag as well.
@@ -185,12 +193,14 @@ object Ads {
     /** The banner filled: it is on screen and earning. */
     internal fun reportLoaded() {
         Log.i(TAG, "Banner loaded and showing")
+        bannerLoaded = true
         status = "Banner is showing"
     }
 
     /** The banner did not fill. [error] is whatever the SDK explained. */
     internal fun reportFailed(error: Any?) {
         Log.w(TAG, "Banner did not load: $error")
+        bannerLoaded = false
         status = "No ad right now — the ad service answered: $error"
     }
 

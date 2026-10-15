@@ -8,6 +8,9 @@
  *                         optional extra; the app itself asks the AI service
  *                         directly with the user's own key)
  *   GET  /v1/stats        aggregated numbers for the dashboard (JSON)
+ *   GET  /v1/about        the text the app's About page shows (public)
+ *   PUT  /v1/about        saves that text (admin token) — this is how the
+ *                         About page is edited without shipping a new APK
  *   GET  /                the dashboard itself (asks for the admin token)
  *
  * Storage is a D1 database bound as DB (see wrangler.toml and schema.sql).
@@ -44,6 +47,11 @@ const SCHEMA_SQL = [
      sdk       INTEGER
    )`,
   `CREATE INDEX IF NOT EXISTS idx_installs_day ON installs (first_day)`,
+  `CREATE TABLE IF NOT EXISTS about (
+     id      TEXT PRIMARY KEY,
+     json    TEXT    NOT NULL,
+     updated INTEGER NOT NULL
+   )`,
 ];
 
 let schemaPromise = null;
@@ -77,6 +85,9 @@ export default {
     if (url.pathname === "/v1/stats") {
       return handleStats(request, env, url);
     }
+    if (url.pathname === "/v1/about") {
+      return handleAbout(request, env, url);
+    }
     if (url.pathname === "/" || url.pathname === "/index.html") {
       return new Response(DASHBOARD_HTML, {
         headers: { "content-type": "text/html; charset=utf-8" },
@@ -97,8 +108,8 @@ export default {
 function corsHeaders() {
   return {
     "access-control-allow-origin": "*",
-    "access-control-allow-methods": "POST, GET, OPTIONS",
-    "access-control-allow-headers": "content-type",
+    "access-control-allow-methods": "POST, PUT, GET, OPTIONS",
+    "access-control-allow-headers": "content-type, x-admin-token",
   };
 }
 
@@ -466,6 +477,133 @@ async function handleStats(request, env, url) {
 }
 
 /**
+ * The About page shown inside the app.
+ *
+ * `GET /v1/about` is public — the app reads it without a token, because it is
+ * only the app's own description — and `PUT /v1/about` needs the admin token,
+ * which is what the dashboard uses. Whatever is stored here appears in the app
+ * within a tap of the About screen's Refresh, so the text can be changed without
+ * shipping a new APK.
+ */
+const ABOUT_DEFAULT = {
+  title: "AI Calculator",
+  tagline: "A calculator that does the maths a phone calculator usually cannot.",
+  body: [
+    "Graphing with pan, zoom and trace, a solver for equations, derivatives, " +
+      "integrals and series, matrices with inverses and determinants, unit " +
+      "conversion across eleven kinds of measurement, statistics, and ten " +
+      "everyday calculators from GST and EMI to BMI and dates.",
+    "The maths engine is pure Kotlin and runs entirely on the phone — nothing " +
+      "about a calculation leaves it. Ask AI is the one part that uses the " +
+      "internet, and only with the free API key you paste in yourself.",
+    "Built with Kotlin and Jetpack Compose. It has no accounts, no sign-in, " +
+      "and one small banner ad, which is what keeps it free.",
+  ],
+  links: [],
+  contact: "",
+  updated: 0,
+};
+
+const ABOUT_LIMITS = { title: 80, tagline: 200, body: 12, paragraph: 900, links: 8 };
+const ABOUT_LINK_LABEL = 60;
+
+/** Trims a value to a string of at most [max] characters. */
+function cleanText(value, max) {
+  return String(value ?? "").trim().slice(0, max);
+}
+
+/** Reads the request body as JSON, or null when it is not an object. */
+async function readJson(request) {
+  try {
+    const value = await request.json();
+    return value && typeof value === "object" ? value : null;
+  } catch (error) {
+    return null;
+  }
+}
+
+async function handleAbout(request, env, url) {
+  let stored = null;
+  try {
+    await ensureSchema(env);
+    stored = await env.DB.prepare("SELECT json, updated FROM about WHERE id = ?")
+      .bind("about")
+      .first();
+  } catch (error) {
+    return json({ error: "database error", detail: String(error) }, 500);
+  }
+
+  if (request.method === "GET") {
+    if (!stored || !stored.json) {
+      return json({ ...ABOUT_DEFAULT, source: "default" });
+    }
+    try {
+      return json({ ...JSON.parse(stored.json), updated: Number(stored.updated || 0),
+                    source: "saved" });
+    } catch (error) {
+      // A row that cannot be read is not worth breaking the page over.
+      return json({ ...ABOUT_DEFAULT, source: "default" });
+    }
+  }
+
+  if (request.method !== "PUT" && request.method !== "POST") {
+    return json({ error: "method not allowed" }, 405);
+  }
+
+  const token = url.searchParams.get("token") ?? request.headers.get("x-admin-token") ?? "";
+  if (!env.ADMIN_TOKEN || token !== env.ADMIN_TOKEN) {
+    return json({ error: "unauthorised" }, 401);
+  }
+
+  const body = await readJson(request);
+  if (!body) {
+    return json({ error: "expected a JSON object" }, 400);
+  }
+
+  const paragraphs = Array.isArray(body.body)
+    ? body.body
+        .map((line) => cleanText(line, ABOUT_LIMITS.paragraph))
+        .filter((line) => line.length > 0)
+        .slice(0, ABOUT_LIMITS.body)
+    : ABOUT_DEFAULT.body;
+
+  const links = Array.isArray(body.links)
+    ? body.links
+        .map((link) => ({
+          label: cleanText(link && link.label, ABOUT_LINK_LABEL),
+          url: cleanText(link && link.url, 300),
+        }))
+        // Only http(s): the app opens these, and a stray scheme would be a way
+        // to make every user's phone do something unexpected.
+        .filter((link) => link.label && /^https?:\/\//.test(link.url))
+        .slice(0, ABOUT_LIMITS.links)
+    : [];
+
+  const page = {
+    title: cleanText(body.title, ABOUT_LIMITS.title) || ABOUT_DEFAULT.title,
+    tagline: cleanText(body.tagline, ABOUT_LIMITS.tagline) || ABOUT_DEFAULT.tagline,
+    body: paragraphs.length > 0 ? paragraphs : ABOUT_DEFAULT.body,
+    links,
+    contact: cleanText(body.contact, 120),
+  };
+  const updated = Date.now();
+  const jsonText = JSON.stringify(page);
+
+  try {
+    await env.DB.prepare(
+      "INSERT INTO about (id, json, updated) VALUES (?, ?, ?) " +
+        "ON CONFLICT(id) DO UPDATE SET json = excluded.json, updated = excluded.updated"
+    )
+      .bind("about", jsonText, updated)
+      .run();
+  } catch (error) {
+    return json({ error: "database error", detail: String(error) }, 500);
+  }
+
+  return json({ ...page, updated, source: "saved" });
+}
+
+/**
  * The privacy policy. Google Play requires a reachable URL for an app that
  * sends anything off the device, and the Worker is already deployed, so
  * https://<your-worker>.workers.dev/privacy is that URL. Edit CONTACT below to
@@ -646,6 +784,30 @@ const DASHBOARD_HTML = `<!doctype html>
     <div class="muted">App versions (new installs)</div>
     <table><tbody id="versions"></tbody></table>
   </div>
+
+  <!-- The About page the app shows. Saving here changes it in the app without
+       shipping a new APK: the app fetches it and keeps a copy for offline. -->
+  <div class="panel">
+    <div class="muted">About page (shown inside the app)</div>
+    <div style="display:grid; gap:8px; margin-top:10px; max-width:640px">
+      <label class="muted">Title<input id="ab-title" style="width:100%"></label>
+      <label class="muted">Tagline<input id="ab-tagline" style="width:100%"></label>
+      <label class="muted">Text — one paragraph per line
+        <textarea id="ab-body" rows="8" style="width:100%; font:inherit; padding:8px;
+                  border-radius:10px; border:1px solid var(--line); background:#1b1920;
+                  color:var(--text)"></textarea></label>
+      <label class="muted">Links — one per line, as <code>Label | https://address</code>
+        <textarea id="ab-links" rows="3" style="width:100%; font:inherit; padding:8px;
+                  border-radius:10px; border:1px solid var(--line); background:#1b1920;
+                  color:var(--text)"></textarea></label>
+      <label class="muted">Support email<input id="ab-contact" style="width:100%"></label>
+      <div class="row">
+        <button id="ab-save">Save the About page</button>
+        <button id="ab-reload" style="background:#332f39; color:var(--text)">Reload</button>
+        <span class="muted" id="ab-status"></span>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -724,9 +886,66 @@ const DASHBOARD_HTML = `<!doctype html>
     }).join("") || '<tr><td class="muted">Nothing yet.</td></tr>';
   }
 
+  // --- About page editing ------------------------------------------------
+  function loadAbout() {
+    el("ab-status").textContent = "Loading…";
+    fetch("/v1/about").then(function (r) { return r.json(); }).then(function (data) {
+      el("ab-title").value = data.title || "";
+      el("ab-tagline").value = data.tagline || "";
+      el("ab-body").value = (data.body || []).join("\n");
+      el("ab-links").value = (data.links || []).map(function (link) {
+        return link.label + " | " + link.url;
+      }).join("\n");
+      el("ab-contact").value = data.contact || "";
+      el("ab-status").textContent = data.source === "saved"
+        ? "Saved copy, last changed " + new Date(data.updated || 0).toLocaleString()
+        : "Showing the built-in text — nothing saved yet.";
+    }).catch(function (error) {
+      el("ab-status").textContent = "Could not load: " + error.message;
+    });
+  }
+
+  function saveAbout() {
+    var links = el("ab-links").value.split("\n").map(function (line) {
+      var parts = line.split("|");
+      return { label: (parts[0] || "").trim(), url: (parts[1] || "").trim() };
+    }).filter(function (link) { return link.label && link.url; });
+
+    var payload = {
+      title: el("ab-title").value,
+      tagline: el("ab-tagline").value,
+      body: el("ab-body").value.split("\n").map(function (line) { return line.trim(); })
+        .filter(function (line) { return line.length > 0; }),
+      links: links,
+      contact: el("ab-contact").value,
+    };
+    el("ab-status").textContent = "Saving…";
+    fetch("/v1/about?token=" + encodeURIComponent(token), {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    }).then(function (r) {
+      if (r.status === 401) throw new Error("That token was not accepted — enter it above first.");
+      if (!r.ok) throw new Error("The worker answered " + r.status + ".");
+      return r.json();
+    }).then(function (data) {
+      el("ab-status").textContent = "Saved. The app shows this within a tap of Refresh on its " +
+        "About page (" + new Date(data.updated).toLocaleString() + ").";
+    }).catch(function (error) {
+      el("ab-status").textContent = error.message;
+    });
+  }
+
+  el("ab-save").addEventListener("click", function () {
+    if (!token) { el("ab-status").textContent = "Enter the admin token above first."; return; }
+    saveAbout();
+  });
+  el("ab-reload").addEventListener("click", loadAbout);
+
   el("load").addEventListener("click", function () {
     token = el("token").value.trim();
     load();
+    loadAbout();
   });
   el("range").addEventListener("change", load);
   el("refresh").addEventListener("click", load);
@@ -734,6 +953,7 @@ const DASHBOARD_HTML = `<!doctype html>
     if (event.key === "Enter") { token = el("token").value.trim(); load(); }
   });
 
+  loadAbout();
   if (token) load();
 })();
 </script>

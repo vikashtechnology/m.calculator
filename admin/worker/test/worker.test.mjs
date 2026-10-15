@@ -13,22 +13,32 @@
 const rows = [];
 const installs = new Set();
 const tables = new Set();
+let aboutRow = null;   // { json, updated } once the dashboard saves a page
 let ddlRuns = 0;
 
 class Stmt {
   constructor(sql, args) { this.sql = sql; this.args = args || []; }
   bind(...args) { return new Stmt(this.sql, args); }
-  async run() { this.guard(); return { success: true }; }
+  async run() {
+    this.guard();
+    if (this.sql.startsWith("INSERT INTO about")) {
+      aboutRow = { json: this.args[1], updated: this.args[2] };
+    }
+    return { success: true };
+  }
   async first() {
     this.guard();
     if (this.sql.includes("COUNT(*) AS total FROM installs")) return { total: installs.size };
+    if (this.sql.includes("FROM about")) {
+      return aboutRow ? { json: aboutRow.json, updated: aboutRow.updated } : null;
+    }
     return {};
   }
   async all() { this.guard(); return { results: [] }; }
   guard() {
-    const needs = /events|installs/.test(this.sql) && !/CREATE (TABLE|INDEX)/.test(this.sql);
+    const needs = /events|installs|about/.test(this.sql) && !/CREATE (TABLE|INDEX)/.test(this.sql);
     if (!needs) return;
-    for (const table of ["events", "installs"]) {
+    for (const table of ["events", "installs", "about"]) {
       if (this.sql.includes(table) && !tables.has(table)) {
         throw new Error("no such table: " + table);
       }
@@ -71,7 +81,9 @@ let res = await worker.fetch(new Request("https://x.workers.dev/health"), env);
 let body = await res.json();
 check("health ok on an empty database", res.status === 200 && body.ok === true, JSON.stringify(body));
 check("health reports the schema was created", body.schema === "ready", String(body.schema));
-check("tables were created", tables.has("events") && tables.has("installs"), [...tables].join());
+check("tables were created",
+      tables.has("events") && tables.has("installs") && tables.has("about"),
+      [...tables].join());
 check("health lists secrets", body.secrets && body.secrets.ADMIN_TOKEN === true);
 check("health hides no values", JSON.stringify(body).indexOf("localdev") === -1);
 
@@ -103,6 +115,51 @@ check("stats needs the token", res.status === 401);
 res = await worker.fetch(new Request("https://x.workers.dev/v1/stats?days=7&token=localdev"), env);
 body = await res.json();
 check("stats answers with the token", res.status === 200 && body.days === 7, JSON.stringify(body).slice(0, 80));
+
+// the About page the app shows: public to read, admin-only to change
+res = await worker.fetch(new Request("https://x.workers.dev/v1/about"), env);
+body = await res.json();
+check("about defaults are served", res.status === 200 && body.source === "default" &&
+      typeof body.title === "string" && Array.isArray(body.body), JSON.stringify(body).slice(0, 90));
+check("about default names the app", body.title === "AI Calculator", String(body.title));
+
+res = await worker.fetch(new Request("https://x.workers.dev/v1/about", {
+  method: "PUT",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ title: "AI Calculator by Vikas" }),
+}), env);
+check("changing about needs the token", res.status === 401, String(res.status));
+
+res = await worker.fetch(new Request("https://x.workers.dev/v1/about?token=localdev", {
+  method: "PUT",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    title: "AI Calculator",
+    tagline: "Fast maths",
+    body: ["First line.", "  ", "Second line."],
+    links: [
+      { label: "Website", url: "https://example.com" },
+      { label: "Bad", url: "javascript:alert(1)" },
+      { label: "", url: "https://example.com" },
+    ],
+    contact: "help@example.com",
+  }),
+}), env);
+body = await res.json();
+check("about saves with the token", res.status === 200 && body.source === "saved",
+      JSON.stringify(body).slice(0, 90));
+check("blank paragraphs are dropped", body.body.length === 2, JSON.stringify(body.body));
+check("non-http links are dropped", body.links.length === 1 &&
+      body.links[0].url === "https://example.com", JSON.stringify(body.links));
+
+res = await worker.fetch(new Request("https://x.workers.dev/v1/about"), env);
+body = await res.json();
+check("the saved page is what the app gets", body.source === "saved" &&
+      body.tagline === "Fast maths" && body.contact === "help@example.com",
+      JSON.stringify(body).slice(0, 120));
+
+res = await worker.fetch(new Request("https://x.workers.dev/v1/about", { method: "DELETE" }), env);
+check("about rejects other methods", res.status === 405, String(res.status));
 
 // dashboard page
 res = await worker.fetch(new Request("https://x.workers.dev/"), env);

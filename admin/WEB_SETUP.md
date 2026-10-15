@@ -98,6 +98,32 @@ Do **not** run anything in the Console tab; the Worker creates the tables itself
 **Nothing else is needed for the dashboard itself.** Steps 7 and 8 are what make
 the *app* send numbers.
 
+### Editing the app's About page
+
+The same dashboard edits the page that **☰ → About AI Calculator** shows in the
+app:
+
+1. Scroll to the panel headed **About page (shown inside the app)**.
+2. Type the title, the tagline, the paragraphs (one per line), any links (one per
+   line as `Label | https://address`) and a support email.
+3. Select **Save the About page** — the token box at the top of the page is the
+   one it uses; if you have not entered it yet, enter it there first.
+4. In the app: **☰ → About AI Calculator → Refresh**. The new text appears. The
+   app also keeps the last copy it downloaded, so the page reads correctly with
+   no connection.
+
+Notes:
+
+* Nothing needs creating in the database: the Worker makes the `about` table the
+  first time it needs it (the same `CREATE TABLE IF NOT EXISTS` list as the
+  counters). If you deploy with `wrangler` instead, `schema.sql` creates it too.
+* Only `http` and `https` links are accepted, at most 8 of them, and the text is
+  trimmed to sensible lengths — the page inside the app cannot be made to do
+  anything odd from here.
+* Leaving the boxes empty restores the built-in wording.
+* `GET /v1/about` is public (the app reads it without a token); saving needs the
+  admin token, exactly like the stats.
+
 ## 7. Point the app at it (GitHub, one field)
 
 1. Open <https://github.com/vikashtechnology/m.calculator/settings/secrets/actions>

@@ -71,6 +71,14 @@ class Prefs(context: Context) {
         get() = sp.getInt(KEY_PRECISION, DisplayOptions.DEFAULT.significantDigits)
         set(value) = sp.edit { putInt(KEY_PRECISION, value.coerceIn(1, 15)) }
 
+    /**
+     * The last About page the Worker sent, as JSON. Kept so the About screen
+     * shows real content offline, and so it is instant on opening.
+     */
+    var aboutJson: String
+        get() = sp.getString(KEY_ABOUT, "") ?: ""
+        set(value) = sp.edit { putString(KEY_ABOUT, value) }
+
     /** How digits are separated: none, 1,234,567 or 12,34,567. */
     var grouping: DigitGrouping
         get() = runCatching { DigitGrouping.valueOf(sp.getString(KEY_GROUPING, null)!!) }
@@ -169,6 +177,7 @@ class Prefs(context: Context) {
         const val KEY_HISTORY = "history"
         const val KEY_PRECISION = "precision"
         const val KEY_GROUPING = "indian_grouping"
+        const val KEY_ABOUT = "about_json"
         const val KEY_HAPTICS = "haptics"
         const val KEY_KEY_SOUND = "key_sound"
         const val KEY_THEME = "theme_mode"

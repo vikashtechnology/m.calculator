@@ -188,6 +188,32 @@ a random per-install id: no expressions, results, files or accounts. The switch
 *Anonymous usage stats* in the drop-down menu turns it off, and builds without a
 `TELEMETRY_URL` never send anything at all.
 
+## About page, edited from the dashboard
+
+**☰ → About AI Calculator** shows the app icon, the version, and text that comes
+from the stats Worker (`GET /v1/about`) — the same dashboard has a panel that
+saves it (`PUT /v1/about`, admin token), so the wording, the paragraphs and the
+links change without a new APK. The last copy that arrived is kept on the phone,
+so the page works offline; with nothing saved yet it shows the bundled text.
+`admin/WEB_SETUP.md` walks through editing it.
+
+## Layout rules
+
+The screen never hides something the user needs:
+
+* **The ad slot keeps its height whether or not an ad fills.** When there is no
+  ad it carries a tip about the app instead of an empty band, and tapping the tip
+  opens the help. Ads appear on every screen, the ad rules and screen height
+  permitting.
+* **Everything that can grow scrolls.** The drop-down menu scrolls inside the
+  space above the ad slot, so the rows at the bottom are reachable on a short
+  screen; the solver, the matrix screen, the stats, the converter, the settings,
+  the About page and the everyday tools all scroll as a whole.
+* **Results wrap instead of clipping.** A long number in an everyday calculator
+  wraps under its label rather than being pushed off the edge.
+* **On a very short screen** (landscape, split screen) the pad scrolls rather
+  than squashing the keys below a tappable size.
+
 ## Ads, and checking they work
 
 One banner-only AdMob ad sits in a fixed slot at the bottom of the calculator
