@@ -62,7 +62,8 @@ fun DisplayPanel(
     onCycleAngle: () -> Unit,
     onTogglePolar: () -> Unit,
     onHistory: () -> Unit,
-    onOpenAi: () -> Unit,
+    /** Opens Ask AI, carrying the current sum so it can be explained. */
+    onExplainWithAi: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
     onClearEntry: () -> Unit,
@@ -129,11 +130,12 @@ fun DisplayPanel(
                 )
             }
             // Ask AI lives here now, beside the history button, instead of
-            // taking a card of its own above the keypad.
-            IconButton(onClick = onOpenAi) {
+            // taking a card of its own above the keypad. What is on the display
+            // travels with it: an answer to check, or the error to explain.
+            IconButton(onClick = onExplainWithAi) {
                 Icon(
                     imageVector = Icons.Filled.AutoAwesome,
-                    contentDescription = "Ask AI",
+                    contentDescription = "Ask AI about this",
                     tint = colors.primary
                 )
             }

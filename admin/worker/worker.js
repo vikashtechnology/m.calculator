@@ -4,7 +4,9 @@
  * One Worker, no dependencies, no build step:
  *   POST /v1/events        the app posts anonymous counters here
  *   POST /v1/solve        Ask AI: verifies the user's Google sign-in and asks
- *                         Gemini with the key kept here, never in the app
+ *                         a model with a key kept here, never in the app (an
+ *                         optional extra; the app itself asks the AI service
+ *                         directly with the user's own key)
  *   GET  /v1/stats        aggregated numbers for the dashboard (JSON)
  *   GET  /                the dashboard itself (asks for the admin token)
  *
@@ -539,17 +541,20 @@ information from apps that use its services</a>.</p>
 </ul>
 
 <h2>3. Ask AI (optional, only when you use it)</h2>
-<p>Ask AI is off until you paste your own Google Gemini API key into
-<code>☰ → Ask AI → ⚙</code>. The key is stored on your device only. When you send
-a question, the text you typed and any image or file you attached are sent to
-Google's Gemini API to be answered, under
-<a href="https://ai.google.dev/gemini-api/terms">Google's Gemini API terms</a>
-and <a href="https://policies.google.com/privacy">Google's privacy policy</a>.
-The chat has no memory: each question is sent on its own, and nothing is stored
-on a server by this app.</p>
+<p>Ask AI is off until you paste your own API key into
+<code>☰ → Ask AI → ⚙</code>. The app sends your questions to the AI service that
+key belongs to — <b>Groq</b> by default, and OpenRouter, Cerebras or another
+service if you pick one — and never through this site. The key is stored on your
+device only. When you send a question, the text you typed and any image or file
+you attached are sent to that service to be answered, under that service's own
+terms and privacy policy. The chat has no memory: each question is sent on its
+own, and nothing is stored on a server by this app.</p>
 <ul>
   <li><b>Camera or files:</b> used only for the question you are sending at that
       moment.</li>
+  <li><b>Voice:</b> the microphone button hands your speech to the phone's own
+      speech recogniser, which turns it into text. The app records nothing and
+      keeps no audio.</li>
   <li><b>Delete:</b> remove the key in the app, and nothing more can be sent.</li>
 </ul>
 

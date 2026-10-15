@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -56,6 +58,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -73,12 +76,16 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.advanceai.calculator.ai.AiChat
-import com.advanceai.calculator.ai.AiModels
-import com.advanceai.calculator.ai.GeminiClient
+import com.advanceai.calculator.ai.AiProvider
+import com.advanceai.calculator.ai.OpenAiClient
+import com.advanceai.calculator.ai.rememberVoiceInput
 import com.advanceai.calculator.ai.PickedAttachment
 import com.advanceai.calculator.data.UserKeys
 import kotlinx.coroutines.launch
 import java.io.File
+
+/** The largest file the picker will take; photos are shrunk before sending. */
+private const val MaxPickedBytes = 25 * 1024 * 1024
 
 /**
  * Ask AI as a chat: type a question, or take a photo or attach a file, and the
@@ -105,8 +112,52 @@ fun AiChatScreen(
     var draft by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf<PickedAttachment?>(null) }
     var preview by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-    var settingsOpen by remember { mutableStateOf(!GeminiClient.hasKey) }
+    var settingsOpen by remember { mutableStateOf(!OpenAiClient.isConfigured(context)) }
     var pendingPhoto by remember { mutableStateOf<Uri?>(null) }
+    var listening by remember { mutableStateOf(false) }
+
+    // Dictation uses the phone's own recogniser; partial results land in the
+    // question box as they are heard.
+    val voice = rememberVoiceInput(
+        onPartial = { heard -> draft = heard },
+        onFinal = { heard ->
+            draft = heard
+            listening = false
+        },
+        onProblem = { message ->
+            listening = false
+            showMessage(message)
+        }
+    )
+
+    val micPermission = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            listening = true
+            voice.start(context)
+        } else {
+            showMessage("The microphone permission is needed to dictate a question")
+        }
+    }
+
+    fun toggleMic() {
+        if (listening) {
+            voice.stop()
+            listening = false
+            return
+        }
+        val granted = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            listening = true
+            voice.start(context)
+        } else {
+            micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
 
     // Something was shared with the app that is not a calculation: it lands in
     // the box, ready to send.
@@ -200,13 +251,18 @@ fun AiChatScreen(
     ) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         val picked = runCatching { readAttachment(context, uri, "upload") }.getOrNull()
-        if (picked == null) {
-            showMessage("That file could not be read")
-        } else if (picked.bytes.size > GeminiClient.MaxAttachmentBytes) {
-            showMessage("That file is larger than 15 MB — try a photo instead")
-        } else {
-            pending = picked
-            preview = decodePreview(context, uri)
+        when {
+            picked == null -> showMessage("That file could not be read")
+            picked.mimeType == "application/pdf" ->
+                // The chat-completions models the app uses read photos, not
+                // PDFs; saying so now beats sending it and waiting for a 400.
+                showMessage("PDFs cannot be read by this model — photograph or screenshot it")
+            picked.bytes.size > MaxPickedBytes ->
+                showMessage("That file is larger than 25 MB — try a photo instead")
+            else -> {
+                pending = picked
+                preview = decodePreview(context, uri)
+            }
         }
     }
 
@@ -214,9 +270,9 @@ fun AiChatScreen(
         val question = draft
         val attachment = pending
         if (question.isBlank() && attachment == null) return
-        if (!GeminiClient.hasKey) {
+        if (!OpenAiClient.isConfigured(context)) {
             settingsOpen = true
-            showMessage("Add your Gemini API key first")
+            showMessage("Paste your API key first — it is free and takes a minute")
             return
         }
         AiChat.ask(context, question, attachment)
@@ -235,7 +291,7 @@ fun AiChatScreen(
             .imePadding()
     ) {
         ChatHeader(
-            model = AiModels.resolve(context),
+            model = OpenAiClient.selectedModel(context),
             onClose = onClose,
             onNewChat = {
                 AiChat.clear()
@@ -279,13 +335,17 @@ fun AiChatScreen(
 
         if (settingsOpen) {
             ChatSettingsCard(
-                onOpenStudio = {
-                    val opened = runCatching {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse("https://aistudio.google.com/apikey"))
-                        )
-                    }.isSuccess
-                    if (!opened) showMessage("Open aistudio.google.com/apikey in a browser")
+                onOpenKeyPage = {
+                    val provider = UserKeys.provider(context)
+                    val page = provider.keyUrl
+                    if (page.isBlank()) {
+                        showMessage("Ask your AI service where its keys are")
+                    } else {
+                        val opened = runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(page)))
+                        }.isSuccess
+                        if (!opened) showMessage("Open $page in a browser")
+                    }
                 },
                 onDismiss = { settingsOpen = false }
             )
@@ -297,6 +357,8 @@ fun AiChatScreen(
             attachment = pending,
             preview = preview,
             busy = busy,
+            listening = listening,
+            onMic = { toggleMic() },
             onClearAttachment = {
                 pending = null
                 preview = null
@@ -365,7 +427,7 @@ private fun ChatHeader(
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
                 Text(
-                    text = "${AiModels.describe(model)} · no memory",
+                    text = "${AiProvider.describeModel(model)} · no memory",
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.onSurfaceVariant,
                     maxLines = 1,
@@ -440,6 +502,14 @@ private fun ChatBubble(
                 .shadow(2.dp, RoundedCornerShape(18.dp))
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                turn.model?.let { answered ->
+                    Text(
+                        text = "answered by ${AiProvider.describeModel(answered)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
                 turn.attachment?.let { label ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -457,16 +527,26 @@ private fun ChatBubble(
                     }
                 }
                 when (turn.kind) {
-                    AiChat.Turn.Kind.PENDING -> Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(15.dp),
-                            strokeWidth = 2.dp
-                        )
+                    // The bubble is empty until the first fragment arrives, then
+                    // fills in as the answer streams: words appear while the
+                    // model is still writing them.
+                    AiChat.Turn.Kind.PENDING -> if (turn.text.isBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(15.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Text(
+                                text = "Working it out…",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    } else {
                         Text(
-                            text = "Working it out…",
+                            text = turn.text,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -522,7 +602,7 @@ private fun ChatWelcome(
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(
-            text = "Type it, photograph it, or attach a file. " +
+            text = "Type it, dictate it, photograph it, or attach a text file. " +
                 "Each question is answered on its own — this chat has no memory.",
             style = MaterialTheme.typography.bodyMedium,
             color = colors.onSurfaceVariant,
@@ -583,6 +663,8 @@ private fun ChatComposer(
     attachment: PickedAttachment?,
     preview: androidx.compose.ui.graphics.ImageBitmap?,
     busy: Boolean,
+    listening: Boolean,
+    onMic: () -> Unit,
     onClearAttachment: () -> Unit,
     onTakePhoto: () -> Unit,
     onAttach: () -> Unit,
@@ -651,10 +733,21 @@ private fun ChatComposer(
                         tint = colors.secondary
                     )
                 }
+                IconButton(onClick = onMic) {
+                    Icon(
+                        imageVector = Icons.Filled.Mic,
+                        contentDescription = if (listening) "Stop dictating" else "Dictate a question",
+                        // Red while the microphone is open, so it is obvious
+                        // when the phone is listening.
+                        tint = if (listening) colors.error else colors.secondary
+                    )
+                }
                 OutlinedTextField(
                     value = draft,
                     onValueChange = onDraftChange,
-                    placeholder = { Text("Ask a maths question…") },
+                    placeholder = {
+                        Text(if (listening) "Listening…" else "Ask a maths question…")
+                    },
                     maxLines = 4,
                     shape = RoundedCornerShape(20.dp),
                     // `outline` (not `outlineVariant`) for the resting border: on
@@ -703,14 +796,21 @@ private fun ChatComposer(
 
 @Composable
 private fun ChatSettingsCard(
-    onOpenStudio: () -> Unit,
+    onOpenKeyPage: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val colors = MaterialTheme.colorScheme
+    val scope = rememberCoroutineScope()
+
+    var provider by remember { mutableStateOf(UserKeys.provider(context)) }
     var keyDraft by remember { mutableStateOf("") }
-    var savedKey by remember { mutableStateOf(UserKeys.geminiKey(context)) }
-    var model by remember { mutableStateOf(AiModels.resolve(context)) }
+    var savedKey by remember { mutableStateOf(UserKeys.apiKey(context)) }
+    var model by remember { mutableStateOf(OpenAiClient.selectedModel(context)) }
+    var baseUrl by remember { mutableStateOf(UserKeys.baseUrl(context)) }
+    var loading by remember { mutableStateOf(false) }
+    var note by remember { mutableStateOf("") }
+    val fetched = remember { mutableStateListOf<String>() }
 
     Surface(
         color = colors.surfaceContainerHighest,
@@ -728,7 +828,7 @@ private fun ChatSettingsCard(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Key and model",
+                    text = "AI service and key",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     modifier = Modifier.weight(1f)
                 )
@@ -741,11 +841,66 @@ private fun ChatSettingsCard(
                 }
             }
 
+            Text(
+                text = "Each of these gives away free keys — no card, no sign-up with us. " +
+                    "The key stays on this phone.",
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.onSurfaceVariant
+            )
+
+            // --- which service ------------------------------------------------
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                AiProvider.entries.forEach { entry ->
+                    Surface(
+                        onClick = {
+                            provider = entry
+                            UserKeys.setProvider(context, entry)
+                            // A model from the old provider means nothing to the
+                            // new one, so start it on the new provider's default.
+                            model = entry.defaultModel
+                            UserKeys.setModel(context, entry.defaultModel)
+                            fetched.clear()
+                        },
+                        color = if (provider == entry) colors.primaryContainer else colors.surfaceContainer,
+                        contentColor = if (provider == entry) colors.onPrimaryContainer else colors.onSurfaceVariant,
+                        shape = RoundedCornerShape(10.dp),
+                        shadowElevation = if (provider == entry) 2.dp else 1.dp
+                    ) {
+                        Text(
+                            text = entry.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+
+            if (provider.needsBaseUrl) {
+                OutlinedTextField(
+                    value = baseUrl,
+                    onValueChange = {
+                        baseUrl = it
+                        UserKeys.setBaseUrl(context, it)
+                    },
+                    label = { Text("Service address") },
+                    placeholder = { Text("https://my-service/v1") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "Any service that speaks the OpenAI chat-completions API works: " +
+                        "the address ends in /v1 and the app adds /chat/completions.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurfaceVariant
+                )
+            }
+
+            // --- the key ------------------------------------------------------
             OutlinedTextField(
                 value = keyDraft,
                 onValueChange = { keyDraft = it },
-                label = { Text(if (savedKey.isBlank()) "Gemini API key" else "Replace the key") },
-                placeholder = { Text("AIza…") },
+                label = { Text(if (savedKey.isBlank()) "API key" else "Replace the key") },
+                placeholder = { Text(provider.keyHint) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -761,51 +916,116 @@ private fun ChatSettingsCard(
                     onClick = {
                         val key = keyDraft.trim()
                         if (key.isEmpty()) return@Button
-                        UserKeys.setGeminiKey(context, key)
+                        UserKeys.setApiKey(context, key)
                         savedKey = key
                         keyDraft = ""
                     },
                     enabled = keyDraft.isNotBlank()
                 ) { Text("Save the key") }
-                OutlinedButton(onClick = onOpenStudio) { Text("Get a free key") }
+                if (provider.keyUrl.isNotBlank()) {
+                    OutlinedButton(onClick = onOpenKeyPage) { Text("Get a free key") }
+                }
                 if (savedKey.isNotBlank()) {
                     TextButton(onClick = {
-                        UserKeys.clearGeminiKey(context)
+                        UserKeys.clearApiKey(context)
                         savedKey = ""
                     }) { Text("Remove") }
                 }
             }
 
-            Text(
-                text = "Model",
-                style = MaterialTheme.typography.labelLarge,
-                color = colors.onSurfaceVariant
+            // --- the model ----------------------------------------------------
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Model",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    onClick = {
+                        loading = true
+                        scope.launch {
+                            val models = OpenAiClient.listModels(context)
+                            fetched.clear()
+                            if (models.isEmpty()) {
+                                // Either the key is not saved yet or the service
+                                // did not answer; the known list keeps the card
+                                // usable, and the note says so.
+                                fetched.addAll(provider.knownModels)
+                                note = "The model list could not be loaded. Save your key " +
+                                    "first, or type the model id yourself."
+                            } else {
+                                fetched.addAll(models.take(24))
+                                note = "${models.size} models available to this key."
+                            }
+                            loading = false
+                        }
+                    },
+                    enabled = !loading
+                ) {
+                    Text(if (loading) "Loading…" else "Load models")
+                }
+            }
+
+            OutlinedTextField(
+                value = model,
+                onValueChange = {
+                    model = it
+                    UserKeys.setModel(context, it)
+                },
+                label = { Text("Model id") },
+                placeholder = { Text("openai/gpt-oss-120b") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
             )
-            AiModels.choices.chunked(2).forEach { row ->
+
+            val shown = if (fetched.isEmpty()) provider.knownModels else fetched
+            shown.chunked(2).forEach { row ->
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(bottom = 4.dp)
                 ) {
-                    row.forEach { (id, label) ->
+                    row.forEach { id ->
                         Surface(
                             onClick = {
-                                UserKeys.setGeminiModel(context, id)
                                 model = id
+                                UserKeys.setModel(context, id)
                             },
                             color = if (model == id) colors.primaryContainer else colors.surfaceContainer,
                             contentColor = if (model == id) colors.onPrimaryContainer else colors.onSurfaceVariant,
                             shape = RoundedCornerShape(10.dp),
-                            shadowElevation = if (model == id) 2.dp else 1.dp
+                            shadowElevation = if (model == id) 2.dp else 1.dp,
+                            modifier = Modifier.weight(1f)
                         ) {
                             Text(
-                                text = label,
+                                text = AiProvider.describeModel(id),
                                 style = MaterialTheme.typography.labelMedium,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                             )
                         }
                     }
+                    // Keep the last line aligned when it holds one chip.
+                    repeat(2 - row.size) { Spacer(modifier = Modifier.weight(1f)) }
                 }
             }
+
+            if (note.isNotEmpty()) {
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.onSurfaceVariant
+                )
+            }
+
+            Text(
+                text = "Photos need a model that can see. When the one you picked cannot, " +
+                    "the app switches to one that can for that question and says which " +
+                    "model answered.",
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.onSurfaceVariant
+            )
             Text(
                 text = "Ask AI has no memory: each message is sent on its own, and " +
                     "nothing is saved on the phone. Closing the app clears the chat.",
@@ -833,8 +1053,8 @@ fun readAttachment(
 
     val bytes = resolver.openInputStream(uri)?.use { it.readBytes() }
         ?: throw IllegalStateException("The file could not be opened")
-    if (bytes.size > GeminiClient.MaxAttachmentBytes) {
-        throw IllegalStateException("That file is larger than 15 MB")
+    if (bytes.size > MaxPickedBytes) {
+        throw IllegalStateException("That file is larger than 25 MB")
     }
     return PickedAttachment(name = name, mimeType = mimeType, bytes = bytes)
 }

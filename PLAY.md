@@ -259,7 +259,8 @@ what the code actually does:
 | Does your app collect or share any required user data types? | **Yes** |
 | **App activity → App interactions** | Collected, not shared, **optional** (the user can turn the counters off), used for Analytics |
 | **Device or other IDs** | Collected (a random install id made on the phone, not an Android ID), not shared, optional, used for Analytics |
-| **Photos** | Shared **only** when the user attaches one to an Ask AI question — with Google's Gemini API, for App functionality. Not stored by the app |
+| **Photos** | Shared **only** when the user attaches one to an Ask AI question — with the AI service the user's own key belongs to (Groq by default), for App functionality. Not stored by the app |
+| **Voice** | Ask AI can dictate a question using the phone's own speech recogniser. The app records nothing and keeps no audio |
 | **Files and docs** | Same as photos, for PDFs and text attachments |
 | Location, personal info, financial info, messages, contacts, health | **Not collected** |
 | Is data encrypted in transit? | **Yes** (HTTPS only) |

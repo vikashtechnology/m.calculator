@@ -73,24 +73,11 @@ jobs:
           # Optional: bump this before each Play upload (Play rejects a repeated
           # versionCode). Settings → Secrets and variables → Actions → Variables.
           PLAY_VERSION_CODE: ${{ vars.PLAY_VERSION_CODE }}
-          # Optional: a Google AI Studio key, used only for people who have not
-          # pasted their own key into the app yet.
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
         run: |
           set -o pipefail
           GRADLE_ARGS=""
-          echo "Ask AI runs on the key each user pastes in; the model defaults to"
-          echo "gemini-3.6-flash unless -PgeminiModel says otherwise."
-          if [ -n "$GEMINI_API_KEY" ]; then
-            GRADLE_ARGS="$GRADLE_ARGS -PgeminiApiKey=$GEMINI_API_KEY"
-            echo "Ask AI: a fallback key is compiled in (users may still use their own)"
-          else
-            echo "Ask AI: no fallback key compiled in (users bring their own)"
-          fi
-          if [ -n "$GEMINI_MODEL" ]; then
-            GRADLE_ARGS="$GRADLE_ARGS -PgeminiModel=$GEMINI_MODEL"
-          fi
+          echo "Ask AI: each user pastes their own free key in the app (Groq by"
+          echo "default), so no credential is compiled into this APK."
           if [ -n "$TELEMETRY_URL" ]; then
             GRADLE_ARGS="$GRADLE_ARGS -PtelemetryUrl=$TELEMETRY_URL"
             echo "Usage stats: enabled ($TELEMETRY_URL)"

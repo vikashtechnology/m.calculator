@@ -111,44 +111,57 @@ between them. Every field recalculates as you type — there is no Solve button.
 
 ### Ask AI (bring your own key — nothing to sign up for)
 The **Ask AI** icon in the readout's toolbar (beside the history button) opens
-a chat:
+a chat, and carries what is on the display with it: an answer travels as "explain
+step by step how this is worked out", an error as "this gave an error, what went
+wrong?".
 
-* **type** a question, **photograph** it with the in-app camera, or **attach** a
-  photo, PDF or text file — then send
-* answers come back as messages with the working, ready to copy
+* **type** a question, **dictate** it, **photograph** it with the in-app camera,
+  or **attach** a photo or text file — then send
+* the answer **streams in** as it is written, so words appear while the model is
+  still working rather than after a long pause
+* answers come back with the working, ready to copy
 * **no memory**: every question is sent on its own, nothing is stored on the
   phone, and *New chat* (or closing the app) wipes the thread
 * if an answer arrives while you are elsewhere in the app, a notification tells
   you it is ready
 
-It runs on a **Gemini API key the user pastes in themselves**:
+It runs on a **free API key the user pastes in themselves**, for whichever
+service they prefer — they all speak the same OpenAI-style API, so switching is
+a tap:
 
-* the Ask AI settings card (the gear) takes the key; *Get a free key* opens
-  `aistudio.google.com/apikey` — one click with any Google account, no card
-* the key stays in the app's private storage, is sent only to Google with the
-  question, and can be removed from the same card
-* the same card picks the model: **Gemini 3.6 Flash** by default, with 3.8
-  Flash, 3.5 Flash and 3.5 Flash-Lite one tap away (Google retires these on a
-  schedule, so switching is a tap rather than an update)
-* no sign-in, no account, and nothing about the user reaches this app's author
+| Service | Default model | Where the key comes from |
+| --- | --- | --- |
+| **Groq** (default) | GPT-OSS 120B | `console.groq.com/keys` — email login, no card |
+| OpenRouter | you pick from the live list | `openrouter.ai/keys` |
+| Cerebras | you pick from the live list | `cloud.cerebras.ai` |
+| Other | any OpenAI-compatible service | the address and key of that service |
 
-Builders can compile in a fallback key (`GEMINI_API_KEY` secret or
-`-PgeminiApiKey=`), used only until the user saves one of their own.
+* Groq is the default because nothing else answers as fast: its hardware runs
+  open models at several hundred tokens a second, which is what makes a chat
+  feel instant. *Load models* in the settings card asks the service what the key
+  can use, so a retired model is a tap to replace rather than a broken app
+* a photo needs a model that can see; when the chosen one cannot, the app uses
+  the provider's vision model for that question, and the answer says which model
+  wrote it
+* the key stays in the app's private storage, is sent only to that service with
+  the question, and can be removed from the same card
+* no sign-in, no account, and **no key is compiled into the APK** — so a copy of
+  the app someone else installs cannot spend the publisher's quota
 
 Permissions, and what they are for:
 
 | Permission | Why |
 | --- | --- |
-| `INTERNET` | Ask AI talking to the Gemini API. Nothing else leaves the phone. |
+| `INTERNET` | Ask AI talking to the AI service, and the ad banner. Nothing else leaves the phone. |
 | `CAMERA` | Photographing a question inside Ask AI — requested the first time the camera button is tapped, and never needed otherwise. |
+| `RECORD_AUDIO` | Dictating a question. The phone's own speech recogniser turns speech into text; the app records nothing and keeps no audio. |
 | `POST_NOTIFICATIONS` | The "your answer is ready" notification (Android 13+), requested when Ask AI opens. |
 
 Optional build properties:
 
 ```bash
--PgeminiApiKey=…        # a fallback key for people who have not pasted one
--PgeminiModel=…         # override the default model, gemini-3.6-flash
--PtelemetryUrl=…        # sends anonymous usage counts to the admin dashboard
+-PtelemetryUrl=…        # the Cloudflare Worker that counts anonymous usage
+-PversionCode=…         # the versionCode Play wants for an upload
 ```
 
 ### Usage dashboard (optional)
@@ -210,16 +223,17 @@ keyPassword=…
 EOF
 ```
 
-Toolchain: AGP 8.5.2, Kotlin 2.0.21, Gradle 8.9, JDK 17, compileSdk 34, minSdk 24.
+Toolchain: AGP 8.5.2, Kotlin 2.4.10, Gradle 8.9, JDK 17, compileSdk and
+targetSdk 36, minSdk 24. (Kotlin 2.4 is not optional: the AdMob SDKs carry Kotlin
+2.3+ metadata that older compilers refuse to read.)
 
 Optional build properties (all safe to leave out):
 
 ```bash
--PaiProxyUrl=…          # Ask AI through your Worker: users just sign in with Google
--PgoogleWebClientId=…   # the Web OAuth client ID every Google sign-in needs
--PgeminiApiKey=…        # alternative: call Gemini straight from the app
--PgeminiModel=…         # optional model override, default gemini-2.5-flash
 -PtelemetryUrl=…        # sends anonymous usage counts to the admin dashboard
+-PversionCode=…         # the versionCode Play wants for an upload
+-PadmobAppId=…          # override the AdMob app ID from gradle.properties
+-PadmobBannerUnitId=…   # override the banner unit ID
 ```
 
 ## Project layout
@@ -230,7 +244,8 @@ app/src/main/java/com/advanceai/calculator/
 │                    matrix, calculus, units, formatter (no Android imports)
 ├── data/            SharedPreferences store for settings, variables, history,
 │                    the user's own API key and the anonymous usage counters
-├── ai/              the chat state, the Gemini client and the notification
+├── ai/              the chat state, the OpenAI-compatible client, dictation,
+│                    image shrinking and the answer notification
 ├── ui/              Compose UI: view model, keypads, sheets, theme
 │   ├── components/  keypad grid and display panel
 │   └── screens/     pad, graph, solver, matrix, units, stats, Ask AI, everyday tools

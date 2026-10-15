@@ -2,9 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- The maths engine is 100% offline and needs no permissions. INTERNET is
-         used by "Ask AI", which talks to the Gemini API with the user's own
-         key, and by the AdMob banner; CAMERA and POST_NOTIFICATIONS belong to
-         the Ask AI screen. -->
+         used by "Ask AI", which talks to the AI service the user pasted a key
+         for (Groq by default), and by the AdMob banner; CAMERA,
+         POST_NOTIFICATIONS and RECORD_AUDIO belong to the Ask AI screen. -->
+    <!-- Ask AI: dictate a question. The phone's own speech recogniser turns the
+         voice into text; the app records nothing and keeps no audio. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- Ask AI: photograph a question in the app. -->
     <uses-permission android:name="android.permission.CAMERA" />

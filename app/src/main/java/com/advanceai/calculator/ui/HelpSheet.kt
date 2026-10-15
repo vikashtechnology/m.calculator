@@ -93,12 +93,14 @@ fun HelpSheet(onDismiss: () -> Unit) {
             Section(
                 "Ask AI",
                 listOf(
-                    "Tap the Ask AI card on the pad: type a question, take a photo, or attach a file.",
-                    "It answers as a chat, with the steps, and keeps no memory — each question stands alone.",
-                    "The gear icon holds your own free Gemini key (Get a free key opens Google AI Studio)",
-                    "and the model picker — Gemini 3.6 Flash by default, newer Flash models one tap away.",
+                    "Tap the sparkle icon beside history: ask about what is on the display, or start fresh.",
+                    "Type it, dictate it with the microphone, photograph it, or attach a text file.",
+                    "Answers stream in as they are written, with the steps, and it keeps no memory.",
+                    "The gear icon holds your own free API key — Groq by default (console.groq.com/keys),",
+                    "or OpenRouter, Cerebras or any OpenAI-compatible service. No key is built into the app.",
+                    "A photo needs a model that can see; the app switches for that question and says so.",
                     "An answer that arrives while you are on another screen shows up as a notification.",
-                    "Ask AI needs the internet, a camera only if you take a photo; everything else is offline."
+                    "Ask AI needs the internet, and the camera or microphone only when you use them."
                 )
             )
             Section(

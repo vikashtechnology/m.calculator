@@ -32,8 +32,6 @@ android {
     // Its SHA-1 is in app/signing/fingerprints.txt.
     val bundledKeystore = rootProject.file("app/signing/mcalculator.p12")
     val telemetryUrl: String = (findProperty("telemetryUrl") as String?) ?: ""
-    val geminiKey: String = (findProperty("geminiApiKey") as String?) ?: ""
-    val geminiModelName: String = (findProperty("geminiModel") as String?) ?: ""
     // AdMob: the publisher's own IDs when gradle.properties carries them,
     // Google's test IDs otherwise.
     val admobAppId: String = (findProperty("admobAppId") as String?) ?: testAdmobAppId
@@ -57,14 +55,6 @@ android {
         // Where the anonymous usage counts go (the Cloudflare Worker in
         // admin/worker). Empty = the counters are never sent anywhere.
         buildConfigField("String", "TELEMETRY_URL", "\"$telemetryUrl\"")
-        // A Google AI Studio key turns Ask AI into the native Gemini screen.
-        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
-        // Defaults to Gemini 3.6 Flash when the build does not name a model.
-        buildConfigField(
-            "String",
-            "GEMINI_MODEL",
-            "\"" + geminiModelName.ifBlank { "gemini-3.6-flash" } + "\""
-        )
         // AdMob IDs the ads code reads at runtime.
         buildConfigField("String", "ADMOB_APP_ID", "\"$admobAppId\"")
         buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"$admobBannerUnitId\"")

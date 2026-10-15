@@ -3,7 +3,7 @@
 A read-only dashboard for AI Calculator: installs, active users, and calculations
 and AI questions per day, with a per-day table and a chart.
 
-The Worker also ships an **optional** `/v1/solve` endpoint that holds the Gemini
+The Worker also ships an **optional** `/v1/solve` endpoint that holds the AI
 key server-side and checks a Google sign-in — the app does not call it (Ask AI
 runs on the key the *user* pastes in), so leave those two secrets unset and the
 Worker is purely the dashboard.
@@ -170,7 +170,11 @@ The Worker checks the JWT itself, with WebCrypto and no dependencies: it fetches
 Google's published keys from `https://www.googleapis.com/oauth2/v3/certs` (cached
 for 30 minutes), verifies the RS256 signature, and checks `aud` against
 `GOOGLE_WEB_CLIENT_ID`, `iss` against `accounts.google.com` and `exp` against the
-clock. Only then does it call Gemini with `env.GEMINI_API_KEY`.
+clock. Only then does it call the model with `env.GEMINI_API_KEY`.
+
+> The app itself does not use this endpoint: Ask AI talks to the AI service
+directly with the key each user pasted in. This proxy is here for anyone who
+wants to hold the key server-side instead.
 
 * without `GOOGLE_WEB_CLIENT_ID` on the Worker, `/v1/solve` answers anonymously
   (handy while trying it out, but anyone with the URL could use your key);

@@ -65,7 +65,8 @@ private val KeypadOuterPadding = 12.dp
 fun PadScreen(
     viewModel: CalculatorViewModel,
     showMessage: (String) -> Unit,
-    onOpenAi: () -> Unit,
+    /** Opens Ask AI. The argument is a question to start from, or null. */
+    onOpenAi: (String?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val state = viewModel.ui
@@ -81,6 +82,25 @@ fun PadScreen(
             else -> state.expression
         }
     }
+    /**
+     * What the AI button carries: the error that needs explaining, or the sum
+     * with its answer to check and break down. Empty display = plain chat.
+     */
+    fun questionForAi(): String? {
+        val expression = state.expression.trim()
+        val error = state.error
+        return when {
+            expression.isNotEmpty() && error != null ->
+                "This gave an error: $expression\nError: $error\nWhat went wrong, and what " +
+                    "should the answer be?"
+            expression.isNotEmpty() && state.resultText.isNotEmpty() ->
+                "Explain step by step how this is worked out: $expression = " +
+                    state.resultText.replace(",", "")
+            expression.isNotEmpty() -> "Help with this: $expression"
+            else -> null
+        }
+    }
+
     val feedback = rememberKeyFeedback(
         haptics = viewModel.settings.haptics,
         sound = viewModel.settings.keySound
@@ -123,7 +143,7 @@ fun PadScreen(
                     onCycleAngle = { viewModel.cycleAngleMode() },
                     onTogglePolar = { viewModel.setPolar(!state.polar) },
                     onHistory = { showHistory = true },
-                    onOpenAi = onOpenAi,
+                    onExplainWithAi = { onOpenAi(questionForAi()) },
                     onCopy = {
                         val text = payload().replace(",", "")
                         if (text.isNotEmpty()) {

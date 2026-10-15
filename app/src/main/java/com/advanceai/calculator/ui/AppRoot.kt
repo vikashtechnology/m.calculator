@@ -251,7 +251,10 @@ fun AppRoot(
                             AppTab.CALC -> PadScreen(
                                 viewModel = viewModel,
                                 showMessage = showMessage,
-                                onOpenAi = { aiOpen = true }
+                                onOpenAi = { question ->
+                                    aiSeed = question
+                                    aiOpen = true
+                                }
                             )
                             AppTab.GRAPH -> GraphScreen(viewModel = viewModel, showMessage = showMessage)
                             AppTab.SOLVE -> SolverScreen(viewModel = viewModel)
