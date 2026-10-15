@@ -3,6 +3,7 @@ package com.advanceai.calculator.data
 import android.content.Context
 import androidx.core.content.edit
 import com.advanceai.calculator.engine.AngleMode
+import com.advanceai.calculator.engine.DigitGrouping
 import com.advanceai.calculator.engine.DisplayOptions
 import org.json.JSONArray
 import org.json.JSONObject
@@ -25,7 +26,7 @@ enum class AppThemeMode(val label: String) {
  */
 data class AppSettings(
     val digits: Int = DisplayOptions.DEFAULT.significantDigits,
-    val indianGrouping: Boolean = false,
+    val grouping: DigitGrouping = DigitGrouping.NONE,
     val haptics: Boolean = true,
     val keySound: Boolean = false
 )
@@ -70,10 +71,11 @@ class Prefs(context: Context) {
         get() = sp.getInt(KEY_PRECISION, DisplayOptions.DEFAULT.significantDigits)
         set(value) = sp.edit { putInt(KEY_PRECISION, value.coerceIn(1, 15)) }
 
-    /** Indian digit grouping, so 1234567 reads 12,34,567. */
-    var indianGrouping: Boolean
-        get() = sp.getBoolean(KEY_GROUPING, false)
-        set(value) = sp.edit { putBoolean(KEY_GROUPING, value) }
+    /** How digits are separated: none, 1,234,567 or 12,34,567. */
+    var grouping: DigitGrouping
+        get() = runCatching { DigitGrouping.valueOf(sp.getString(KEY_GROUPING, null)!!) }
+            .getOrDefault(DigitGrouping.NONE)
+        set(value) = sp.edit { putString(KEY_GROUPING, value.name) }
 
     /** A short knock on every key press. */
     var haptics: Boolean
@@ -88,14 +90,14 @@ class Prefs(context: Context) {
     /** Everything the Settings sheet edits, read in one go. */
     fun settings(): AppSettings = AppSettings(
         digits = precision,
-        indianGrouping = indianGrouping,
+        grouping = grouping,
         haptics = haptics,
         keySound = keySound
     )
 
     fun save(settings: AppSettings) {
         precision = settings.digits
-        indianGrouping = settings.indianGrouping
+        grouping = settings.grouping
         haptics = settings.haptics
         keySound = settings.keySound
     }

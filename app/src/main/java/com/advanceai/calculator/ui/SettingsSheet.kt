@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.advanceai.calculator.data.AppSettings
+import com.advanceai.calculator.engine.DigitGrouping
 import com.advanceai.calculator.engine.DisplayOptions
 import com.advanceai.calculator.ui.theme.appChipColors
 
@@ -72,13 +73,24 @@ fun SettingsSheet(
                 }
             }
 
-            SettingSwitch(
-                title = "Indian digit grouping",
-                detail = "Group digits the Indian way: 12,34,567 instead of 1,234,567. " +
-                    "Useful for rupees, lakhs and crores.",
-                checked = settings.indianGrouping,
-                onCheckedChange = { onChange(settings.copy(indianGrouping = it)) }
+            SettingTitle(
+                "Digit grouping",
+                "Separators in long numbers. The Indian style reads in lakhs and " +
+                    "crores: 12,34,567."
             )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                GROUPING_CHOICES.forEach { (choice, label) ->
+                    FilterChip(
+                        selected = settings.grouping == choice,
+                        onClick = { onChange(settings.copy(grouping = choice)) },
+                        label = { Text(label) },
+                        colors = appChipColors()
+                    )
+                }
+            }
 
             SettingSwitch(
                 title = "Vibrate on key press",
@@ -112,6 +124,13 @@ fun SettingsSheet(
         }
     }
 }
+
+/** The three grouping styles, with the label each chip shows. */
+private val GROUPING_CHOICES = listOf(
+    DigitGrouping.NONE to "1234567",
+    DigitGrouping.WESTERN to "1,234,567",
+    DigitGrouping.INDIAN to "12,34,567"
+)
 
 @Composable
 private fun SettingTitle(title: String, detail: String) {

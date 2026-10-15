@@ -144,7 +144,7 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
 
     /** What the engine prints with: digits shown and digit grouping. */
     private fun displayOptions(): DisplayOptions =
-        DisplayOptions(settings.digits, settings.indianGrouping)
+        DisplayOptions(settings.digits, settings.grouping)
 
     var ui by mutableStateOf(
         CalcUiState(

@@ -39,7 +39,11 @@ object Formatter {
             plain.toPlainString()
         }
         val plainText = if (text == "-0") "0" else text
-        return group(plainText, display.indianGrouping)
+        return when (display.grouping) {
+            DigitGrouping.NONE -> plainText
+            DigitGrouping.WESTERN -> group(plainText, indian = false)
+            DigitGrouping.INDIAN -> group(plainText, indian = true)
+        }
     }
 
     /** True for the digits-and-separators text the grouping helper accepts. */
