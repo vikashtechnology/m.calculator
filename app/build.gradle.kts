@@ -163,6 +163,10 @@ dependencies {
     // in the EEA, the UK and Switzerland.
     implementation("com.google.android.ump:user-messaging-platform:4.0.0")
 
+    // The donate QR code: core is pure Java, no Android views, and encodes the
+    // UPI payment link the dashboard supplies. Small and dependency-free.
+    implementation("com.google.zxing:core:3.5.3")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")

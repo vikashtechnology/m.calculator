@@ -12,10 +12,12 @@ database_name = "m_calculator_stats"
 database_id = "REPLACE_WITH_THE_ID_FROM_WRANGLER"
 
 # The dashboard password. Set it once, never commit it:
-#   npx wrangler secret put ADMIN_TOKEN
+#   npx wrangler secret put ADMIN_EMAIL          (the address that signs in)
+#   npx wrangler secret put ADMIN_PASSWORD_HASH  (node hash-password.mjs '…')
 #
 # [vars]
-# ADMIN_TOKEN = "localdev"   # then: wrangler dev --local
+# ADMIN_EMAIL = "you@example.com"                  # then: wrangler dev --local
+# ADMIN_PASSWORD_HASH = "pbkdf2$120000$…"          # node hash-password.mjs '…'
 
 [observability]
 enabled = true

@@ -120,9 +120,19 @@ private val LightColors = lightColorScheme(
 
 // ---- Roles Material 3 has no slot for -------------------------------------- //
 
-/** Colours the Material scheme does not cover, provided through the theme. */
+/**
+ * Colours the Material scheme does not cover, provided through the theme.
+ *
+ * [qrInk] and [qrPlate] are the two colours of a QR code. They are the same in
+ * both themes on purpose: a camera has to resolve the code, and a themed QR
+ * (light modules on a dark card, for instance) simply will not scan.
+ */
 @Immutable
-data class AppColors(val chart: List<Color>)
+data class AppColors(
+    val chart: List<Color>,
+    val qrInk: Color = Color.Black,
+    val qrPlate: Color = Color.White
+)
 
 private val DarkAppColors = AppColors(
     chart = listOf(
@@ -164,6 +174,13 @@ fun appChipColors(): SelectableChipColors {
 /** Chart and plot colours for the current theme. */
 val chartColors: List<Color>
     @Composable get() = LocalAppColors.current.chart
+
+/** The ink and plate of a QR code — fixed, because a camera reads it, not eyes. */
+val qrInk: Color
+    @Composable get() = LocalAppColors.current.qrInk
+
+val qrPlate: Color
+    @Composable get() = LocalAppColors.current.qrPlate
 
 private val LocalAppColors = staticCompositionLocalOf { DarkAppColors }
 

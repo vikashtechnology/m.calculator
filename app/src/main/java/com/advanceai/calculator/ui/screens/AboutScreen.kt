@@ -1,6 +1,10 @@
 package com.advanceai.calculator.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -33,14 +38,23 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.advanceai.calculator.BuildConfig
 import com.advanceai.calculator.R
 import com.advanceai.calculator.data.About
+import com.advanceai.calculator.data.AboutPage
+import com.advanceai.calculator.ui.theme.qrInk
+import com.advanceai.calculator.ui.theme.qrPlate
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.qrcode.QRCodeWriter
 import kotlinx.coroutines.launch
 
 /**
@@ -105,7 +119,7 @@ fun AboutScreen(
             modifier = Modifier.padding(top = 10.dp)
         )
         Text(
-            text = "version ${BuildConfig.VERSION_NAME} · ${BuildConfig.APPLICATION_ID}",
+            text = "Version ${BuildConfig.VERSION_NAME}",
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -137,6 +151,34 @@ fun AboutScreen(
                     LinkRow(label = link.label, onClick = { open(link.url) })
                 }
             }
+        }
+
+        // The donate card, when the dashboard has it switched on. The QR is
+        // drawn from the UPI id in the page itself, so changing the id in the
+        // dashboard changes the code as well — there is no picture to replace.
+        if (page.donate.enabled) {
+            DonateCard(
+                donate = page.donate,
+                onPay = {
+                    val opened = runCatching {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(page.donate.paymentLink()))
+                        )
+                    }.isSuccess
+                    if (!opened) {
+                        showMessage(
+                            "No UPI app answered. The id is ${page.donate.upi} — " +
+                                "pay it from your bank's app instead."
+                        )
+                    }
+                },
+                onCopy = {
+                    val clipboard =
+                        context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("UPI id", page.donate.upi))
+                    showMessage("UPI id copied — ${page.donate.upi}")
+                }
+            )
         }
 
         SectionCard("The app") {
@@ -200,6 +242,105 @@ fun AboutScreen(
         }
     }
 }
+
+/**
+ * The donate card: a QR code the payer scans, the UPI id in plain text, and a
+ * button that hands the payment link to whichever UPI app is installed.
+ *
+ * The code is deliberately black on white whatever the theme, because a camera
+ * has to read it — a dark-mode QR on a dark surface is a coin toss.
+ */
+@Composable
+private fun DonateCard(
+    donate: AboutPage.Donate,
+    onPay: () -> Unit,
+    onCopy: () -> Unit
+) {
+    val ink = qrInk.toArgb()
+    val plate = qrPlate.toArgb()
+    val qr = remember(donate.upi, donate.name, ink, plate) {
+        qrBitmap(donate.paymentLink(), ink, plate)
+    }
+
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 2.dp,
+        shadowElevation = 1.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "Support the app",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+            )
+            Text(
+                text = "It is free, has no accounts, and one small ad keeps it going. " +
+                    "If it has been useful, a contribution is welcome — entirely optional.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+            )
+            if (qr != null) {
+                // White plate behind the code even in dark mode: scanners need
+                // the contrast, and a rounded white card reads as deliberate.
+                Surface(
+                    color = qrPlate,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.size(180.dp)
+                ) {
+                    Image(
+                        bitmap = qr,
+                        contentDescription = "UPI payment QR code for ${donate.upi}",
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+            }
+            Text(
+                text = donate.upi,
+                style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.padding(top = 12.dp)
+            )
+            Text(
+                text = "Scan with any UPI app, or pay this id",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(
+                modifier = Modifier.padding(top = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(onClick = onPay) { Text("Open a UPI app") }
+                TextButton(onClick = onCopy) { Text("Copy id") }
+            }
+        }
+    }
+}
+
+/** Encodes [text] as a QR code, or null if the encoder refuses it. */
+private fun qrBitmap(text: String, ink: Int, plate: Int): ImageBitmap? = runCatching {
+    val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 512, 512)
+    val width = matrix.width
+    val height = matrix.height
+    val pixels = IntArray(width * height)
+    for (y in 0 until height) {
+        val row = y * width
+        for (x in 0 until width) {
+            // QR codes are black-on-white by specification; theming them would
+            // break the camera's ability to find the three corner squares.
+            pixels[row + x] = if (matrix[x, y]) ink else plate
+        }
+    }
+    Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888).asImageBitmap()
+}.getOrNull()
 
 @Composable
 private fun SectionCard(title: String, content: @Composable () -> Unit) {

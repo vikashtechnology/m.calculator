@@ -5,22 +5,28 @@ and AI questions per day, with a per-day table and a chart.
 
 The dashboard also edits the text of the app's **About page**: `GET /v1/about`
 is public (the app fetches it and keeps a copy for offline), `PUT /v1/about`
-needs the admin token. See WEB_SETUP.md.
+needs a signed-in admin session. See WEB_SETUP.md.
+
+The dashboard itself is a static page in `admin/web`, published by GitHub Pages.
+It signs in to the Worker (`POST /v1/login`) and carries the session in an
+`Authorization` header; the Worker serves no HTML for it. That keeps the whole
+admin in one place, on a free host, and the Worker down to an API.
 
 The Worker also ships an **optional** `/v1/solve` endpoint that holds the AI
 key server-side and checks a Google sign-in — the app does not call it (Ask AI
 runs on the key the *user* pastes in), so leave those two secrets unset and the
 Worker is purely the dashboard.
 
-It runs entirely on Cloudflare — one Worker plus one D1 (SQLite) database, both
-free-tier friendly, no other service to sign up for.
+The data side runs entirely on Cloudflare — one Worker plus one D1 (SQLite)
+database, both free-tier friendly. The dashboard page is four static files on
+GitHub Pages, which is free for public repositories.
 
 ```
 phone   ──POST /v1/events──▶  Worker  ──▶  D1 database
 phone   ──POST /v1/solve───▶  Worker  ──▶  Gemini   (after checking the
                                           Google ID token the app sent)
-browser ──GET /────────────▶  dashboard (asks for the admin token)
-browser ──GET /v1/stats────▶  aggregated JSON
+browser ──GET /v1/stats────▶  Worker  ──▶  D1 database   (needs the session)
+github  ──admin/web────────▶  the dashboard page itself, hosted by Pages
 ```
 
 ## What is collected
@@ -39,9 +45,11 @@ still waiting to be uploaded.
 
 **In a browser, no terminal** — follow [`WEB_SETUP.md`](WEB_SETUP.md). You create
 the Worker and the database in the Cloudflare dashboard, paste `worker.js`, set
-the `ADMIN_TOKEN` secret, and open `…/health`; that page creates the tables, so
-there is no SQL to run by hand. The Worker carries its own schema for exactly
-that reason (`SCHEMA_SQL`, kept in step with `schema.sql` by the test runner).
+the `ADMIN_PASSWORD_HASH` secret (made with `hash-password.mjs`), open
+`…/health` — which creates the tables, so there is no SQL to run by hand — and
+turn on GitHub Pages so the dashboard page has somewhere to live. The Worker
+carries its own schema for exactly that reason (`SCHEMA_SQL`, kept in step with
+`schema.sql` by the test runner).
 
 **From a terminal, one command** — everything below, automated.
 
@@ -66,7 +74,9 @@ npx wrangler login                                          # once per machine
 npx wrangler d1 create m_calculator_stats                   # prints database_id
 #   → paste that id into wrangler.toml
 npx wrangler d1 execute m_calculator_stats --remote --file=schema.sql
-npx wrangler secret put ADMIN_TOKEN                         # the dashboard password
+node hash-password.mjs 'your password'                      # → paste as ADMIN_PASSWORD_HASH
+npx wrangler secret put ADMIN_PASSWORD_HASH                 # the dashboard password hash
+npx wrangler secret put ADMIN_EMAIL                         # optional, if not the default
 npx wrangler deploy
 ```
 
@@ -86,7 +96,9 @@ never reveals a secret:
 
 ```json
 { "ok": true, "database": "ok",
-  "secrets": { "ADMIN_TOKEN": true, "GEMINI_API_KEY": false, "GOOGLE_WEB_CLIENT_ID": false } }
+  "signIn": { "method": "email and password; the session goes in an Authorization header",
+              "email": "rajkatrina90@gmail.com", "customPassword": true, "customSessionKey": false },
+  "secrets": { "GEMINI_API_KEY": false, "GOOGLE_WEB_CLIENT_ID": false } }
 ```
 
 Then switch on the app's counters with one GitHub secret
@@ -108,31 +120,54 @@ changes — as soon as these exist:
 | --- | --- | --- |
 | secret | `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → *Edit Cloudflare Workers* |
 | secret | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers → Account ID |
-| secret | `ADMIN_TOKEN` | the password you chose in `setup.sh` |
+| secret | `ADMIN_EMAIL` | the address that signs in (optional; default `rajkatrina90@gmail.com`) |
+| secret | `ADMIN_PASSWORD_HASH` | `node admin/worker/hash-password.mjs '…'` |
 | variable | `D1_DATABASE_ID` | the id `setup.sh` wrote into `wrangler.toml` |
 
 Without them the workflow simply prints what is missing and does nothing.
 
-## Look at the dashboard without deploying
+## The dashboard on GitHub Pages
+
+`admin/web` **is** the dashboard: `index.html`, `app.js`, `style.css` and
+`config.js`, served by GitHub Pages. It holds no data — it signs in to the
+Worker named in `config.js` and reads everything from there. The Worker serves
+no HTML for it and has no pages of its own.
 
 ```bash
-python3 admin/worker/preview.py       # http://localhost:8080
+python3 tools/check_admin_web.py   # element ids, file references, syntax
 ```
 
-Serves the real dashboard page (straight from `worker.js`) with sample numbers,
-so you can see exactly what deploys before signing up to anything.
+`.github/workflows/pages.yml` publishes it on every push to `main` that touches
+`admin/web`. Once, in the repository: **Settings → Pages → Source: GitHub
+Actions**. Private repositories need a paid plan for Pages.
+
+The sign-in: the page calls `POST /v1/login` with the email and password, gets
+back a signed session, and sends it as `Authorization: Bearer …` on every admin
+call. There is no cookie and no token in the address — `github.io` and
+`workers.dev` are different sites, and a cookie across them is a third-party
+cookie that browsers drop. The password is only ever checked by the Worker, and
+the session lives in `sessionStorage` (gone when the tab closes).
 
 ## Local experiments
 
 ```bash
 npx wrangler d1 execute m_calculator_stats --local --file=schema.sql
-npx wrangler dev --local      # http://127.0.0.1:8787, ADMIN_TOKEN from a [vars] entry
+npx wrangler dev --local      # http://127.0.0.1:8787, ADMIN_EMAIL / ADMIN_PASSWORD_HASH from a [vars] entry
 curl -X POST http://127.0.0.1:8787/v1/events \
   -H 'content-type: application/json' \
   -d '{"id":"testinstall1234","day":"2026-10-11","v":"1.0.0","sdk":34,"events":{"calc":12,"app_open":2}}'
 curl -s 'http://127.0.0.1:8787/health'
-curl -s 'http://127.0.0.1:8787/v1/stats?days=7&token=localdev'
+
+# sign in, keep the session, and ask for the numbers
+TOKEN=$(curl -s -X POST http://127.0.0.1:8787/v1/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"rajkatrina90@gmail.com","password":"admin123"}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+curl -s -H "authorization: Bearer $TOKEN" 'http://127.0.0.1:8787/v1/stats?days=7'
 ```
+
+The dashboard is the GitHub Pages page (`admin/web`); the Worker only answers
+its API. Opening the Worker's own `/` forwards there.
 
 ## Privacy policy page
 
@@ -149,9 +184,11 @@ before publishing, then redeploy.
 ```
 
 Runs the Worker against a stub D1 — health, event ingest (including the
-whitelist), the stats token check, the dashboard page and the solver's
-missing-secret path. No Cloudflare account needed. The Android CI workflow runs
-the same script on every push.
+whitelist), signing in with a right and a wrong password, the rate limit, the
+guards on stats and About, forged sessions, the forward from `/`, the privacy
+page and the solver's missing-secret path — then the static checks on
+`admin/web`. No Cloudflare account needed. The Android CI workflow runs the same
+script on every push.
 
 ## API
 
@@ -159,12 +196,16 @@ the same script on every push.
 | --- | --- | --- |
 | `POST` | `/v1/events` | `{id, day, v, sdk, events:{app_open,calc,ai}}` — only these three kinds are stored |
 | `POST` | `/v1/solve` | Ask AI: needs `Authorization: Bearer <Google ID token>`; body `{model, question, attachment:{mimeType,data}}`; answers `{answer, by}` |
-| `GET` | `/v1/stats?days=30&token=…` | totals, DAU/WAU/MAU, per-day series, installs per day, versions |
-| `GET` | `/` | the dashboard |
+| `POST` | `/v1/login` | `{email, password}` → `{email, token, expiresAt, days}`; the dashboard signs in here |
+| `GET` | `/v1/stats?days=30` | totals, DAU/WAU/MAU, per-day series, installs per day, versions — needs `Authorization: Bearer …` |
+| `GET` | `/v1/about` | the About text the app shows (public) |
+| `PUT` | `/v1/about` | saves it — needs `Authorization: Bearer …` |
+| `GET` | `/privacy` | the policy page for the Play listing |
+| `GET` | `/` | forwards to the dashboard on GitHub Pages |
 | `GET` | `/health` | `{"ok":true}` |
 
-Swapping D1 for Supabase or Firebase later only means changing the two places
-that touch `env.DB` in `worker.js` — the endpoints and the dashboard stay as they
+Swapping D1 for Supabase or Firebase later only means changing the places that
+touch `env.DB` in `worker.js` — the endpoints and the dashboard stay as they
 are.
 
 ## How the sign-in check works

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Calculator — admin</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AI Calculator — admin</h1>
+    <p class="muted" id="who">Sign in to see the numbers and edit the About page.</p>
+  </div>
+  <form id="signout-form" hidden>
+    <button type="submit" class="quiet">Sign out</button>
+  </form>
+</header>
+
+<main>
+
+  <!-- Sign in ------------------------------------------------------------ -->
+  <section class="panel" id="signin-panel">
+    <form id="signin-form" autocomplete="on">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="username" required
+             autocapitalize="none" spellcheck="false">
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password"
+             autocomplete="current-password" required>
+
+      <p><button type="submit" id="signin-button">Sign in</button></p>
+      <p class="status" id="signin-status" role="status" aria-live="polite"></p>
+    </form>
+    <p class="muted small">
+      The password is checked by the Worker, never stored by this page, and the
+      session ends when the tab closes. This page is published by GitHub Pages;
+      the numbers live in Cloudflare D1.
+    </p>
+  </section>
+
+  <!-- The dashboard ------------------------------------------------------ -->
+  <div id="app" hidden>
+
+    <section class="panel">
+      <div class="row">
+        <label class="inline" for="range">Range</label>
+        <select id="range">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="365">Last 12 months</option>
+        </select>
+        <button id="refresh" class="quiet">Refresh</button>
+        <span class="muted small" id="stamp"></span>
+      </div>
+      <p class="status" id="load-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="cards" id="cards"></section>
+
+    <section class="panel">
+      <h2>Calculations per day</h2>
+      <div class="chart" id="chart"></div>
+      <div id="chart-empty" class="muted small" hidden>No calculations recorded yet.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Per day</h2>
+      <div class="scroll">
+        <table>
+          <thead>
+            <tr><th>Day</th><th>App opens</th><th>Calculations</th><th>AI questions</th></tr>
+          </thead>
+          <tbody id="table"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>App versions (new installs)</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Version</th><th>Installs</th></tr></thead>
+          <tbody id="versions"></tbody>
+        </table>
+      </div>
+      <p class="muted small" id="versions-empty" hidden>Nothing yet.</p>
+    </section>
+
+    <!-- About page ------------------------------------------------------- -->
+    <section class="panel">
+      <h2>About page (shown inside the app)</h2>
+      <p class="muted small" id="ab-status">Loading…</p>
+
+      <form id="about-form">
+        <label for="ab-title">Title</label>
+        <input id="ab-title" maxlength="80">
+
+        <label for="ab-tagline">Tagline</label>
+        <input id="ab-tagline" maxlength="200">
+
+        <label for="ab-body">Text — one paragraph per line</label>
+        <textarea id="ab-body" rows="10"></textarea>
+
+        <label for="ab-links">Links — one per line, as Label | https://address</label>
+        <textarea id="ab-links" rows="3"></textarea>
+
+        <label for="ab-contact">Support email</label>
+        <input id="ab-contact" maxlength="120">
+
+        <label class="check">
+          <input type="checkbox" id="ab-donate-on">
+          Show the donate button in the app
+        </label>
+
+        <label for="ab-donate-upi">Donate UPI id</label>
+        <input id="ab-donate-upi" maxlength="80" placeholder="name@bank">
+
+        <label for="ab-donate-name">Donate name (what the UPI app shows the payer)</label>
+        <input id="ab-donate-name" maxlength="60">
+
+        <p><button type="submit" id="ab-save">Save the About page</button></p>
+        <p class="status" id="ab-save-status" role="status" aria-live="polite"></p>
+      </form>
+
+      <p class="muted small">
+        After saving, open the app and tap Refresh on its About page
+        (&#9776; &rarr; About AI Calculator).
+      </p>
+    </section>
+
+    <section class="panel">
+      <h2>The Worker</h2>
+      <p class="small">
+        <a id="link-health" href="#">Setup check</a> &middot;
+        <a id="link-privacy" href="#">Privacy policy</a>
+      </p>
+      <p class="muted small">
+        Two plain pages the Worker serves. Everything above it answers as JSON.
+      </p>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <p class="muted small">
+    The numbers live in the Cloudflare Worker at <span id="api-base"></span>
+    (Cloudflare D1). This page is published from the repository by GitHub Pages
+    and holds no data.
+  </p>
+</footer>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

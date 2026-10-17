@@ -217,8 +217,9 @@ carries the real units. Remove the two lines and the build falls back to
 
 Three places say what is happening, in this order of usefulness:
 
-1. **On the phone: ☰ → Settings → the "Ads" box.** It names the units the build
-   carries and the last thing the banner did:
+1. **On the phone, in a *debug* build: ☰ → Settings → "Ad diagnostics".** It
+   names the units the build carries and the last thing the banner did. Release
+   builds show nothing about ads here — the wording below is for the debug box:
 
    | What it says | What it means |
    | --- | --- |

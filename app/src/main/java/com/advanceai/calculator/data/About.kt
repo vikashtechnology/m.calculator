@@ -24,11 +24,30 @@ data class AboutPage(
     val body: List<String>,
     val links: List<Link>,
     val contact: String,
+    /** The donate button; switched on and off from the dashboard. */
+    val donate: Donate = Donate(),
     val updatedAt: Long = 0L,
     /** True when this came from the network rather than the bundled copy. */
     val live: Boolean = false
 ) {
     data class Link(val label: String, val url: String)
+
+    /**
+     * Where a voluntary contribution goes. [upi] is the address a UPI app pays
+     * to; the app turns it into a payment link and a QR code, so nothing is
+     * hard-wired and the admin can change or disable it without a new APK.
+     */
+    data class Donate(
+        val enabled: Boolean = true,
+        val upi: String = "vikashraoa2343-1@oksbi",
+        val name: String = "AI Calculator"
+    ) {
+        /** `upi://pay?...` — what a UPI app understands, and what the QR holds. */
+        fun paymentLink(): String {
+            val payee = java.net.URLEncoder.encode(name.ifBlank { "AI Calculator" }, "UTF-8")
+            return "upi://pay?pa=$upi&pn=$payee&cu=INR"
+        }
+    }
 
     companion object {
         /**
@@ -38,19 +57,27 @@ data class AboutPage(
         val Fallback = AboutPage(
             title = "AI Calculator",
             tagline = "A calculator that does the maths a phone calculator usually cannot.",
+            // The same words the Worker serves by default: what the app does,
+            // and what stays private. Nothing here is written for a developer.
             body = listOf(
-                "Graphing with pan, zoom and trace, a solver for equations, derivatives, " +
-                    "integrals and series, matrices with inverses and determinants, unit " +
-                    "conversion across eleven kinds of measurement, statistics, and ten " +
-                    "everyday calculators from GST and EMI to BMI and dates.",
-                "The maths engine is pure Kotlin and runs entirely on the phone — nothing " +
-                    "about a calculation leaves it. Ask AI is the one part that uses the " +
-                    "internet, and only with the free API key you paste in yourself.",
-                "Built with Kotlin and Jetpack Compose. It has no accounts, no sign-in, " +
-                    "and one small banner ad, which is what keeps it free."
+                "Graph, solve equations, work with matrices, convert units and run " +
+                    "statistics — plus everyday calculators for GST, tax, EMI, BMI and " +
+                    "dates, all in one place.",
+                "Every answer is worked out on your phone, so the calculator keeps " +
+                    "working with no connection, and nothing about a calculation leaves " +
+                    "the device.",
+                "Ask AI is there when you want something explained step by step, using " +
+                    "your own free key. There are no accounts and no sign-in."
             ),
             links = emptyList(),
-            contact = ""
+            contact = "",
+            // The same default the Worker carries, so the button works before
+            // the Worker is redeployed and with no connection at all.
+            donate = Donate(
+                enabled = true,
+                upi = "vikashraoa2343-1@oksbi",
+                name = "AI Calculator"
+            )
         )
     }
 }
@@ -124,12 +151,30 @@ object About {
 
         val title = root.optString("title").trim().ifEmpty { fallback.title }
         val tagline = root.optString("tagline").trim().ifEmpty { fallback.tagline }
+
+        // Absent (an older Worker) means "keep the built-in donate details";
+        // present but blank or malformed means the same, so a typo saved in the
+        // dashboard can never take the button away by accident.
+        val donateJson = root.optJSONObject("donate")
+        val upi = donateJson?.optString("upi")?.trim().orEmpty()
+        val donate = if (upi.contains("@") && !upi.contains(" ")) {
+            AboutPage.Donate(
+                enabled = donateJson?.optBoolean("enabled", true) ?: true,
+                upi = upi,
+                name = donateJson?.optString("name")?.trim().orEmpty()
+                    .ifEmpty { fallback.donate.name }
+            )
+        } else {
+            fallback.donate
+        }
+
         return AboutPage(
             title = title,
             tagline = tagline,
             body = paragraphs.ifEmpty { fallback.body },
             links = links,
             contact = root.optString("contact").trim(),
+            donate = donate,
             updatedAt = root.optLong("updated", 0L)
         )
     }
@@ -145,5 +190,9 @@ object About {
             }
         })
         .put("contact", page.contact)
+        .put("donate", JSONObject()
+            .put("enabled", page.donate.enabled)
+            .put("upi", page.donate.upi)
+            .put("name", page.donate.name))
         .put("updated", page.updatedAt)
 }
