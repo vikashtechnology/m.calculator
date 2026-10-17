@@ -164,55 +164,6 @@ Optional build properties:
 -PversionCode=…         # the versionCode Play wants for an upload
 ```
 
-### Usage dashboard (optional)
-`admin/worker` holds the Cloudflare Worker and the D1 database behind a small
-read-only dashboard: installs, active users (today / week / range) and
-calculations and AI questions per day, with a per-day table and chart. The
-dashboard page itself is `admin/web`, published free by GitHub Pages, so the
-Worker stays an API and the page can be opened from any browser.
-
-There are two ways to set it up: entirely in the Cloudflare dashboard — see
-[`admin/WEB_SETUP.md`](admin/WEB_SETUP.md), where the Worker even creates its own
-tables — or from a terminal with one command:
-
-```bash
-cd admin/worker && ./setup.sh        # creates the database, deploys, prints the URL
-```
-
-Then add the printed URL as the repository secret `TELEMETRY_URL` and the next
-build reports counts. `…/health` lists what is configured; see
-[`admin/README.md`](admin/README.md) for the details and the optional
-auto-deploy workflow.
-
-The app sends only aggregate counts (app opens, calculations, AI questions) with
-a random per-install id: no expressions, results, files or accounts. The switch
-*Anonymous usage stats* in the drop-down menu turns it off, and builds without a
-`TELEMETRY_URL` never send anything at all.
-
-## About page, edited from the dashboard
-
-**☰ → About AI Calculator** shows the app icon, the version, and text that comes
-from the stats Worker (`GET /v1/about`) — the same dashboard has a panel that
-saves it (`PUT /v1/about`, admin sign-in), so the wording, the paragraphs and the
-links change without a new APK. The last copy that arrived is kept on the phone,
-so the page works offline; with nothing saved yet it shows the bundled text.
-`admin/WEB_SETUP.md` walks through editing it.
-
-The About page also carries a **donate card** — a QR code, the UPI id and a
-button that hands the payment link to whichever UPI app is installed — shown only
-while the dashboard has it switched on. The QR is generated on the phone from the
-UPI id the dashboard supplies, so changing the id changes the code. See
-`admin/WEB_SETUP.md`.
-
-The dashboard is `admin/web` — four static files — published by GitHub Pages at
-`https://vikkiroy899.github.io/m.calculator/`. It holds nothing itself: signing in
-goes to the Worker (`POST /v1/login`), and the session it gets back travels in an
-`Authorization` header, because a cookie across `github.io` and `workers.dev`
-would be a third-party cookie and browsers drop those. There is no token in the
-address bar, and changing the password is a Worker secret
-(`ADMIN_PASSWORD_HASH`), never a line in this repository. The Worker's own
-address forwards to the page. See `admin/WEB_SETUP.md`.
-
 ## What the calculator shows when it opens
 
 It starts at **0** — the sum or the answer from the last session is not put back
@@ -325,8 +276,6 @@ app/src/main/java/com/advanceai/calculator/
 │   └── screens/     pad, graph, solver, matrix, units, stats, Ask AI, everyday tools
 └── MainActivity.kt
 app/signing/         the key every build is signed with + its fingerprints
-admin/worker/        the Cloudflare Worker + D1 behind the usage dashboard
-admin/web/           the dashboard page itself (GitHub Pages)
 app/src/test/        JUnit suite for the engine
 tools/               icon generator and the Python reference oracle
 ```

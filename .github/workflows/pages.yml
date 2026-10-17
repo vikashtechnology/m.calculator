@@ -9,11 +9,6 @@ name: Admin page (GitHub Pages)
 # no secrets, and nothing about the dashboard is stored in the repository.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "admin/web/**"
-      - ".github/workflows/pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -28,6 +23,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ false }} # Retired: admin management is Telegram-only.
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -5,6 +5,10 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -21,20 +25,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,17 +68,9 @@ fun AboutScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     var page by remember { mutableStateOf(About.cached(context)) }
-    var refreshing by remember { mutableStateOf(false) }
 
-    // The privacy page lives on the same Worker that serves the About text, so
-    // it is derived from the one URL the build knows.
-    val privacyUrl = remember {
-        val base = BuildConfig.TELEMETRY_URL.ifBlank { "https://ai-calculator-stats.rajkatrina90.workers.dev" }
-        base.trimEnd('/') + "/privacy"
-    }
 
     fun open(url: String) {
         val opened = runCatching {
@@ -87,11 +79,6 @@ fun AboutScreen(
         if (!opened) showMessage("No app on this phone can open $url")
     }
 
-    LaunchedEffect(Unit) {
-        refreshing = true
-        About.refresh(context)?.let { page = it }
-        refreshing = false
-    }
 
     Column(
         modifier = modifier
@@ -183,11 +170,6 @@ fun AboutScreen(
 
         SectionCard("The app") {
             LinkRow(
-                label = "Privacy policy",
-                detail = "What leaves the phone, and what does not",
-                onClick = { open(privacyUrl) }
-            )
-            LinkRow(
                 label = "Rate or review on Google Play",
                 detail = "Reviews are what let other people find it",
                 onClick = { open("market://details?id=${BuildConfig.APPLICATION_ID}") }
@@ -201,45 +183,6 @@ fun AboutScreen(
             }
         }
 
-        Row(
-            modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (refreshing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp
-                )
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = "Checking for newer text…",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                TextButton(onClick = {
-                    scope.launch {
-                        refreshing = true
-                        val fresh = About.refresh(context)
-                        if (fresh != null) page = fresh else
-                            showMessage("Could not reach the app's page — showing the copy on the phone")
-                        refreshing = false
-                    }
-                }) {
-                    Icon(
-                        imageVector = Icons.Filled.Refresh,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = if (page.live) "Refresh" else "Try again",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(start = 6.dp)
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -258,8 +201,10 @@ private fun DonateCard(
 ) {
     val ink = qrInk.toArgb()
     val plate = qrPlate.toArgb()
-    val qr = remember(donate.upi, donate.name, ink, plate) {
-        qrBitmap(donate.paymentLink(), ink, plate)
+    val context = LocalContext.current
+    val logo = remember { runCatching { BitmapFactory.decodeResource(context.resources, R.drawable.app_icon) }.getOrNull() }
+    val qr = remember(donate.upi, donate.name, ink, plate, logo) {
+        qrBitmap(donate.paymentLink(), ink, plate, logo)
     }
 
     Surface(
@@ -326,7 +271,7 @@ private fun DonateCard(
 }
 
 /** Encodes [text] as a QR code, or null if the encoder refuses it. */
-private fun qrBitmap(text: String, ink: Int, plate: Int): ImageBitmap? = runCatching {
+private fun qrBitmap(text: String, ink: Int, plate: Int, logo: Bitmap?): ImageBitmap? = runCatching {
     val matrix = QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 512, 512)
     val width = matrix.width
     val height = matrix.height
@@ -339,7 +284,22 @@ private fun qrBitmap(text: String, ink: Int, plate: Int): ImageBitmap? = runCatc
             pixels[row + x] = if (matrix[x, y]) ink else plate
         }
     }
-    Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888).asImageBitmap()
+    val qr = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888)
+    // Overlay the app logo in the centre. The centre is left clear by the QR
+    // spec's error correction, so a small logo there does not break scanning.
+    if (logo != null) {
+        val canvas = Canvas(qr)
+        val logoSize = width / 5
+        val left = (width - logoSize) / 2
+        val top = (height - logoSize) / 2
+        val src = Rect(0, 0, logo.width, logo.height)
+        val dst = Rect(left, top, left + logoSize, top + logoSize)
+        val backing = Paint().apply { color = plate; style = Paint.Style.FILL }
+        canvas.drawRect((left - 4).toFloat(), (top - 4).toFloat(),
+            (left + logoSize + 4).toFloat(), (top + logoSize + 4).toFloat(), backing)
+        canvas.drawBitmap(logo, src, dst, Paint(Paint.ANTI_ALIAS_FLAG))
+    }
+    qr.asImageBitmap()
 }.getOrNull()
 
 @Composable

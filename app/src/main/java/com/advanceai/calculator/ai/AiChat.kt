@@ -1,7 +1,6 @@
 package com.advanceai.calculator.ai
 
 import android.content.Context
-import com.advanceai.calculator.data.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -109,8 +108,7 @@ object AiChat {
             _busy.value = false
             stopWanted = false
             if (result.ok && !stopped) {
-                // Anonymous count for the dashboard; the question itself is not sent.
-                Telemetry.record(appContext, Telemetry.EVENT_AI)
+                // (no telemetry)
             }
             if (visible == 0 && answerTurn.text.isNotBlank()) {
                 AnswerNotifier.notify(appContext, result.ok, answerTurn.text)

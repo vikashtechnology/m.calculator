@@ -1,5 +1,5 @@
 # M Calculator usage stats — deploy with:  npx wrangler deploy
-name = "m-calculator-stats"
+name = "ai-calculator-stats"
 main = "worker.js"
 compatibility_date = "2024-09-23"
 
