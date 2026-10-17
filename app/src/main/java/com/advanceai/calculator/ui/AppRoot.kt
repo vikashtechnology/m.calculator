@@ -59,7 +59,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -93,7 +92,6 @@ import com.advanceai.calculator.ui.screens.MatrixScreen
 import com.advanceai.calculator.ui.screens.PadScreen
 import com.advanceai.calculator.ui.screens.SolverScreen
 import com.advanceai.calculator.data.AppThemeMode
-import com.advanceai.calculator.data.Telemetry
 import com.advanceai.calculator.ui.screens.EverydayTool
 import com.advanceai.calculator.ui.screens.StatsScreen
 import com.advanceai.calculator.ui.screens.ToolsScreen
@@ -157,9 +155,6 @@ fun AppRoot(
     var helpOpen by remember { mutableStateOf(false) }
     // A shared sentence is a question for Ask AI; a shared sum is for the pad.
     var aiSeed by remember { mutableStateOf<String?>(null) }
-    // Anonymous usage counts feed the admin dashboard; the switch can turn
-    // them off, and nothing is sent while it is off.
-    var statsOn by remember { mutableStateOf(Telemetry.isEnabled(context)) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val showMessage: (String) -> Unit = { message ->
@@ -366,11 +361,6 @@ fun AppRoot(
                         menuOpen = false
                         toolOpen = tool
                     },
-                    statsOn = statsOn,
-                    onStatsChange = { enabled ->
-                        statsOn = enabled
-                        Telemetry.setEnabled(context, enabled)
-                    },
                     themeMode = themeMode,
                     onThemeModeChange = onThemeModeChange,
                     // Google only asks for this entry point where the privacy
@@ -476,8 +466,6 @@ private fun DropDownMenuPanel(
     onSelect: (AppTab) -> Unit,
     onOpenAi: () -> Unit,
     onOpenTool: (EverydayTool) -> Unit,
-    statsOn: Boolean,
-    onStatsChange: (Boolean) -> Unit,
     themeMode: AppThemeMode,
     onThemeModeChange: (AppThemeMode) -> Unit,
     onPrivacyOptions: (() -> Unit)?,
@@ -631,28 +619,6 @@ private fun DropDownMenuPanel(
                 }
             }
 
-            // --- anonymous usage counts (admin dashboard) --------------------
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Anonymous usage stats",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.onSurface
-                    )
-                    Text(
-                        text = "Counts of app opens, calculations and AI questions. " +
-                            "No expressions, answers or files leave the phone.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = colors.onSurfaceVariant
-                    )
-                }
-                Switch(checked = statsOn, onCheckedChange = onStatsChange)
-            }
         }
     }
 }

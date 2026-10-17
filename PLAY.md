@@ -45,7 +45,6 @@ that working after switching to private:
    uploading the APK to Cloudflare R2 / any file host and sharing that URL.
 
 To switch: **Settings → General → Danger zone → Change repository visibility**.
-Everything under `admin/` keeps deploying exactly as before — the worker workflow
 runs inside whichever repository it lives in.
 
 ## Copy-paste kit
@@ -87,7 +86,6 @@ Where the link comes from: Play Console → **Testing → Closed testing → Tes
 **"How testers join your test"** link.
 
 **Support email** — needed on the listing and in the privacy policy. Put the same
-address into `CONTACT` at the top of `admin/worker/worker.js`.
 
 **App category / tags** — *Tools* is the honest category; tags: Calculator,
 Utilities, Education.
@@ -179,11 +177,9 @@ Suggested text:
   > Anonymous usage counts can be switched off in the menu, and nothing is sent
   > while they are off.
 
-* **Privacy policy URL** — the Worker from `admin/worker` already serves one:
 
   ``https://<your-worker>.workers.dev/privacy``
 
-  Before publishing, open `admin/worker/worker.js`, set `CONTACT` at the top to
   the support email you use on the listing, and redeploy (paste and Deploy in
   Cloudflare — see [`WEB_SETUP.md`](WEB_SETUP.md)).
 

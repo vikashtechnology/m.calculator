@@ -1,27 +1,9 @@
 /**
- * AI Calculator — the API behind the app and its admin dashboard.
- *
- * One Worker, no dependencies, no build step. It serves JSON, never HTML for
- * the dashboard: the dashboard itself is a static page in admin/web, published
- * by GitHub Pages, and it talks to these routes.
- *
- *   POST /v1/events        the app posts anonymous counters here
- *   POST /v1/solve         Ask AI: verifies the user's Google sign-in and asks
- *                          a model with a key kept here, never in the app (an
- *                          optional extra; the app itself asks the AI service
- *                          directly with the user's own key)
- *   POST /v1/login         email + password → a signed session (admin/web)
- *   GET  /v1/stats         aggregated numbers for the dashboard (admin only)
- *   GET  /v1/about         the text the app's About page shows (public)
- *   PUT  /v1/about         saves that text (admin only) — this is how the About
- *                          page is edited without a new APK
- *   GET  /privacy          the policy URL on the Play listing
- *   GET  /health           a setup checklist, no secrets in it
- *   GET  /                 forwards to the dashboard on GitHub Pages
- *
- * Admin routes take `Authorization: Bearer <session>`; POST /v1/login returns
- * one. Storage is a D1 database bound as DB (see wrangler.toml and schema.sql).
- * Only whitelisted counters are accepted, so nothing unexpected can be stored.
+ * AI Calculator API + Telegram-only admin. D1 binding: DB.
+ * Secrets: TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID (your positive private user ID).
+ * Register the webhook with tools/setup_telegram.py after deploying.
+ * App routes remain public: events, About GET, privacy, optional AI solve.
+ * Web login/stats/editing are retired, even with old public-mode settings.
  */
 
 const EVENT_KINDS = ["app_open", "calc", "ai"];
@@ -89,8 +71,9 @@ export default {
     }
     // The dashboard is a static page on GitHub Pages (admin/web); this Worker
     // only answers its questions. Everything below is that API.
-    if (url.pathname === "/v1/login") {
-      return handleLoginJson(request, env);
+    if (url.pathname === "/telegram/webhook") return handleTelegram(request, env);
+    if (["/v1/login", "/v1/stats", "/v1/admin-mode"].includes(url.pathname)) {
+      return json({ error: "Web admin removed. Use the Telegram bot." }, 410);
     }
     if (url.pathname === "/v1/events") {
       return handleEvents(request, env);
@@ -99,7 +82,7 @@ export default {
       return handleSolve(request, env);
     }
     if (url.pathname === "/v1/stats") {
-      return handleStats(request, env, url);
+      return json({ error: "Use Telegram" }, 410);
     }
     if (url.pathname === "/v1/about") {
       return handleAbout(request, env, url);
@@ -118,20 +101,12 @@ export default {
       url.pathname === "/dashboard" ||
       url.pathname === "/admin"
     ) {
-      // No page here any more: send the visitor to the one on GitHub Pages.
-      return Response.redirect(ADMIN_PAGE_URL, 302);
+      // No web admin: direct visitors to Telegram.
+      return json({ service: "AI Calculator", admin: "Telegram only" });
     }
     return json({ error: "not found" }, 404);
   },
 };
-
-/**
- * Where the dashboard lives. It is a static page published by GitHub Pages
- * (admin/web), so this Worker carries no HTML for it. Opening the Worker's own
- * address forwards here instead of showing a 404. Change this line if the
- * GitHub account or the repository is renamed.
- */
-const ADMIN_PAGE_URL = "https://vikkiroy899.github.io/m.calculator/";
 
 function corsHeaders() {
   return {
@@ -150,6 +125,7 @@ function json(value, status = 200, extra = {}) {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
       ...corsHeaders(),
       ...extra,
     },
@@ -437,28 +413,14 @@ async function handleHealth(env) {
     service: "AI Calculator stats",
     database,
     schema,
-    signIn: {
-      method: "email and password; the session goes in an Authorization header",
-      // The built-in account exists so a fresh paste works immediately; this
-      // says whether it has been replaced, which is what you want to see.
-      email: adminEmail(env),
-      customPassword: Boolean(env.ADMIN_PASSWORD_HASH),
-      customSessionKey: Boolean(env.SESSION_SECRET),
-    },
+    admin: { method: "Telegram private chat", configured: Boolean(env.TELEGRAM_BOT_TOKEN && /^[1-9]\d*$/.test(String(env.TELEGRAM_CHAT_ID || ""))) },
     endpoints: {
-      dashboard: ADMIN_PAGE_URL + "  (static, on GitHub Pages)",
-      login: "POST /v1/login  {email, password} → {token, expiresAt}",
-      stats: "GET /v1/stats?days=30  (JSON, needs Authorization: Bearer …)",
+      about: "GET /v1/about (public, read only)",
       events: "POST /v1/events",
-      about: "GET /v1/about is public; PUT /v1/about saves (needs the bearer session)",
-      privacy: "GET /privacy  (the URL for the Play Store listing)",
-      solve: "POST /v1/solve  (optional; the app uses the user's own key)",
-      root: "GET /  forwards to the dashboard",
+      privacy: "GET /privacy",
+      telegram: "POST /telegram/webhook (authenticated)",
     },
-    note:
-      "Opening this page creates the tables if the database is empty. " +
-      "The dashboard is a static page on GitHub Pages (admin/web); this Worker " +
-      "is its API. /v1/events is what the app posts to.",
+    note: "Admin management is available only through the configured Telegram private chat.",
   };
   return json(body, database === "ok" ? 200 : 503);
 }
@@ -510,19 +472,6 @@ async function collectStats(env, days) {
     installs: installsByDay.results ?? [],
     versions: versions.results ?? [],
   };
-}
-
-async function handleStats(request, env, url) {
-  if (!(await readSession(env, request))) {
-    return json({ error: "unauthorised", login: "/v1/login" }, 401);
-  }
-
-  const days = Math.min(Math.max(Number(url.searchParams.get("days")) || 30, 1), 365);
-  try {
-    return json(await collectStats(env, days));
-  } catch (error) {
-    return json({ error: "database error", detail: String(error) }, 500);
-  }
 }
 
 /**
@@ -673,25 +622,7 @@ async function handleAbout(request, env, url) {
 
   if (request.method === "GET") return json(current);
 
-  if (request.method !== "PUT" && request.method !== "POST") {
-    return json({ error: "method not allowed" }, 405);
-  }
-
-  if (!(await readSession(env, request))) {
-    return json({ error: "unauthorised", login: "/v1/login" }, 401);
-  }
-
-  const body = await readJson(request);
-  if (!body) {
-    return json({ error: "expected a JSON object" }, 400);
-  }
-
-  try {
-    const saved = await saveAbout(env, body);
-    return json({ ...saved.page, updated: saved.updated, source: "saved" });
-  } catch (error) {
-    return json({ error: "database error", detail: String(error) }, 500);
-  }
+  return json({ error: "Web editing removed. Use Telegram." }, 405);
 }
 
 /**
@@ -803,263 +734,79 @@ write to ${CONTACT}.</p>
 </html>
 `;
 
-/* ---------------------------------------------------------------------------- *
- * Admin sign-in: an email and a password, and a signed session
- *
- * POST /v1/login takes the email and password once and answers with a token:
- * `email
-expiresAt`, base64url, then an HMAC-SHA256 signature. Every admin
- * route checks it from `Authorization: Bearer …`. There is no token in a URL
- * and none in a form, and no cookie: the dashboard is served by GitHub Pages,
- * on a different site from this Worker, where a cookie would be a third-party
- * cookie and browsers would drop it.
- *
- * The signing key is SESSION_SECRET, or — so nothing has to be configured — a
- * random one generated once and kept in the database.
- *
- * The password is never stored: only a PBKDF2-SHA256 hash of it, with a salt.
- * Set ADMIN_EMAIL and ADMIN_PASSWORD_HASH as Worker secrets to change the
- * account; run `node admin/worker/hash-password.mjs` to print a hash.
- * ---------------------------------------------------------------------------- */
-
-const SESSION_DAYS = 30;
-const MAX_LOGIN_FAILURES = 8;
-const LOGIN_WINDOW_MS = 10 * 60 * 1000;
-
-/**
- * The built-in account: the email the dashboard was set up with, and a PBKDF2
- * hash of its password. It exists so the dashboard works the moment this file
- * is pasted, with nothing to configure — but it is in the repository, so treat
- * it as public and change it by setting the two secrets.
- */
-const DEFAULT_ADMIN_EMAIL = "rajkatrina90@gmail.com";
-const DEFAULT_PASSWORD_HASH =
-  "pbkdf2$120000$YWktY2FsY3VsYXRvci9hZG1pbi92MQ$cvJ35zVKu5MLas11-0Lficwk0IffX9F51sKwMJbWmzs";
-
-/** Failed sign-ins per client, so a password cannot be guessed at speed. */
-const loginFailures = new Map();
-
-function base64UrlFromBytes(bytes) {
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+// Webhook authentication derives from the existing bot secret; no third secret
+// is required. The local registration script uses exactly the same derivation.
+async function telegramSecret(token) {
+  const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("telegram-webhook:" + token));
+  return Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2, "0")).join("");
 }
 
-function bytesFromBase64Url(value) {
-  const padded = String(value).replace(/-/g, "+").replace(/_/g, "/");
-  const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-/** Same-length comparison that does not stop early. */
-function equalBytes(a, b) {
-  if (a.length !== b.length) return false;
-  let difference = 0;
-  for (let i = 0; i < a.length; i += 1) difference |= a[i] ^ b[i];
-  return difference === 0;
-}
-
-async function pbkdf2(password, saltBytes, iterations, bits) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"]
-  );
-  const derived = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: saltBytes, iterations, hash: "SHA-256" },
-    key,
-    bits
-  );
-  return new Uint8Array(derived);
-}
-
-function adminEmail(env) {
-  return String(env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL).trim().toLowerCase();
-}
-
-/** True when the password matches the stored hash. */
-async function passwordIsCorrect(env, password) {
-  const stored = String(env.ADMIN_PASSWORD_HASH || DEFAULT_PASSWORD_HASH);
-  const parts = stored.split("$");
-  if (parts.length !== 4 || parts[0] !== "pbkdf2") return false;
-  const iterations = Number(parts[1]);
-  if (!Number.isFinite(iterations) || iterations < 10_000) return false;
-  const salt = bytesFromBase64Url(parts[2]);
-  const expected = bytesFromBase64Url(parts[3]);
-  const actual = await pbkdf2(password, salt, iterations, expected.length * 8);
-  return equalBytes(actual, expected);
-}
-
-/**
- * The key sessions are signed with: SESSION_SECRET when set, otherwise a random
- * one generated once and kept in the database. Generating it means a forged
- * session needs database access, not just a copy of this file.
- */
-let cachedSecret = null;
-
-async function sessionSecret(env) {
-  if (env.SESSION_SECRET) return env.SESSION_SECRET;
-  if (cachedSecret) return cachedSecret;
-  await ensureSchema(env);
-  const existing = await env.DB.prepare("SELECT value FROM settings WHERE key = ?")
-    .bind("session_secret")
-    .first();
-  if (existing && existing.value) {
-    cachedSecret = existing.value;
-    return cachedSecret;
-  }
-  const generated = base64UrlFromBytes(crypto.getRandomValues(new Uint8Array(32)));
-  await env.DB.prepare("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)")
-    .bind("session_secret", generated)
-    .run();
-  const stored = await env.DB.prepare("SELECT value FROM settings WHERE key = ?")
-    .bind("session_secret")
-    .first();
-  cachedSecret = (stored && stored.value) || generated;
-  return cachedSecret;
-}
-
-async function signSession(env, email, expiresAt) {
-  const secret = await sessionSecret(env);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const payload = email + "\n" + expiresAt;
-  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
-  return base64UrlFromBytes(new TextEncoder().encode(payload)) + "." +
-    base64UrlFromBytes(new Uint8Array(signature));
-}
-
-/** The signed session value from `Authorization: Bearer …`, or null. */
-function sessionValue(request) {
-  const header = request.headers.get("authorization") || "";
-  if (!/^\s*Bearer\s+/i.test(header)) return null;
-  return header.replace(/^\s*Bearer\s+/i, "").trim();
-}
-
-/** The signed-in email, or null when there is no valid session. */
-async function readSession(env, request) {
-  return verifySession(env, sessionValue(request));
-}
-
-/** The email for a session this Worker signed, still valid; null otherwise. */
-async function verifySession(env, raw) {
-  if (!raw) return null;
-  const [encoded, signature] = String(raw).split(".");
-  if (!encoded || !signature) return null;
-
-  let payload;
-  try {
-    payload = new TextDecoder().decode(bytesFromBase64Url(encoded));
-  } catch (error) {
-    return null;
-  }
-  const split = payload.lastIndexOf("\n");
-  if (split === -1) return null;
-  const email = payload.slice(0, split);
-  const expiresAt = Number(payload.slice(split + 1));
-  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) return null;
-  if (email !== adminEmail(env)) return null;
-
-  const secret = await sessionSecret(env);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["verify"]
-  );
-  const valid = await crypto.subtle.verify(
-    "HMAC",
-    key,
-    bytesFromBase64Url(signature),
-    new TextEncoder().encode(payload)
-  );
-  return valid ? email : null;
-}
-
-/* ---------------------------------------------------------------------------- *
- * POST /v1/login  {email, password}  →  {email, token, expiresAt, days}
- *
- * 401 when they do not match, 429 after eight failures in ten minutes. The
- * token is what every admin route wants back as `Authorization: Bearer …`,
- * and it is good for 30 days.
- * ---------------------------------------------------------------------------- */
-
-/** Who is asking, for the rate limit: Cloudflare's client address. */
-function loginClient(request) {
-  return (
-    request.headers.get("cf-connecting-ip") ||
-    request.headers.get("x-forwarded-for") ||
-    "unknown"
-  );
-}
-
-function tooManyFailures(client) {
-  const record = loginFailures.get(client);
-  return Boolean(
-    record && Date.now() - record.first < LOGIN_WINDOW_MS && record.count >= MAX_LOGIN_FAILURES
-  );
-}
-
-function noteFailure(client) {
-  const now = Date.now();
-  const record = loginFailures.get(client);
-  const fresh = !record || now - record.first >= LOGIN_WINDOW_MS;
-  loginFailures.set(client, {
-    first: fresh ? now : record.first,
-    count: fresh ? 1 : record.count + 1,
-  });
-}
-
-function clearFailures(client) {
-  loginFailures.delete(client);
-}
-
-/** True when the email is this Worker's admin and the password matches its hash. */
-async function credentialsAreRight(env, email, password) {
-  const emailMatches = email === adminEmail(env);
-  // Always run the hash, even for a wrong email: otherwise the time it takes
-  // to answer would say whether an address is the admin one.
-  const passwordMatches = await passwordIsCorrect(env, password);
-  return emailMatches && passwordMatches;
-}
-
-/** POST /v1/login — JSON in, JSON out. What the dashboard on GitHub Pages calls. */
-async function handleLoginJson(request, env) {
+async function handleTelegram(request, env) {
   if (request.method !== "POST") return json({ error: "use POST" }, 405);
-
-  let body;
+  const chatId = String(env.TELEGRAM_CHAT_ID || "");
+  if (!env.TELEGRAM_BOT_TOKEN || !/^[1-9]\d*$/.test(chatId)) {
+    return json({ error: "Telegram private-chat settings missing" }, 503);
+  }
+  const expected = await telegramSecret(env.TELEGRAM_BOT_TOKEN);
+  const supplied = request.headers.get("x-telegram-bot-api-secret-token") || "";
+  let mismatch = supplied.length ^ expected.length;
+  for (let i = 0; i < expected.length; i++) mismatch |= expected.charCodeAt(i) ^ (supplied.charCodeAt(i) || 0);
+  if (mismatch) return json({ error: "unauthorised" }, 403);
+  const update = await readJson(request);
+  if (!update) return json({ error: "invalid update" }, 400);
+  const message = update.message;
+  // Private messages only: group membership is not admin authorization.
+  if (!message || message.chat?.type !== "private" ||
+      String(message.chat.id) !== chatId || String(message.from?.id) !== chatId ||
+      message.from?.is_bot || typeof message.text !== "string") return json({ ok: true });
+  let reply;
   try {
-    body = await request.json();
+    reply = await telegramCommand(env, message.text);
   } catch (error) {
-    return json({ error: "invalid json" }, 400);
+    reply = "Could not complete the command. Check the D1 binding and retry.";
   }
+  try {
+    // Split long About content into Telegram-safe plain-text messages.
+    for (let offset = 0; offset < reply.length; offset += 3500) {
+      const response = await fetch("https://api.telegram.org/bot" + env.TELEGRAM_BOT_TOKEN + "/sendMessage", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: reply.slice(offset, offset + 3500) }),
+      });
+      if (!response.ok || !(await response.json()).ok) throw new Error("Telegram delivery failed");
+    }
+  } catch (error) {
+    return json({ error: "Telegram delivery failed; update may be retried" }, 502);
+  }
+  return json({ ok: true });
+}
 
-  const email = String(body.email || "").trim().toLowerCase();
-  const password = String(body.password || "");
-  const client = loginClient(request);
-  if (tooManyFailures(client)) {
-    return json({ error: "Too many attempts. Wait ten minutes and try again." }, 429);
+async function telegramCommand(env, text) {
+  const match = /^(\/\w+)(?:@[\w]+)?(?:\s+([\s\S]*))?$/.exec(text.trim());
+  const command = match?.[1] || "/help";
+  const value = (match?.[2] || "").trim();
+  if (command === "/stats") {
+    if (value && !/^(?:[1-9]\d{0,2})$/.test(value)) return "Usage: /stats 30 (1–365 days)";
+    const days = Number(value || 30);
+    if (days > 365) return "Usage: /stats 30 (1–365 days)";
+    const stats = await collectStats(env, days);
+    return `Stats: ${days} days\nInstalls: ${stats.active.installs}\nDaily active: ${stats.active.dau}\nWeekly active: ${stats.active.wau}\nPeriod active: ${stats.active.mau}\nApp opens: ${stats.totals.app_open || 0}\nCalculations: ${stats.totals.calc || 0}\nAI: ${stats.totals.ai || 0}`;
   }
-  if (!(await credentialsAreRight(env, email, password))) {
-    noteFailure(client);
-    return json({ error: "That email and password do not match." }, 401);
+  if (["/about", "/settitle", "/settagline", "/setabout", "/setcontact", "/donation", "/setupi", "/setdonorname"].includes(command)) {
+    const page = await readAbout(env);
+    if (command === "/about") return JSON.stringify(page, null, 2);
+    if (command === "/donation" && !value) return JSON.stringify(page.donate, null, 2);
+    if (!value) return "Provide a value after the command. Use /help.";
+    if (command === "/donation") {
+      if (!["on", "off"].includes(value)) return "Usage: /donation on OR /donation off";
+      page.donate = { ...page.donate, enabled: value === "on" };
+    } else if (command === "/setupi") {
+      if (!UPI_PATTERN.test(value)) return "Invalid UPI ID. Nothing changed.";
+      page.donate = { ...page.donate, upi: value };
+    } else if (command === "/setdonorname") page.donate = { ...page.donate, name: value };
+    else if (command === "/setabout") page.body = value.split(/\n\s*\n/);
+    else page[{ "/settitle": "title", "/settagline": "tagline", "/setcontact": "contact" }[command]] = value;
+    await saveAbout(env, page);
+    return "Saved on the Worker. Only app versions that fetch /v1/about receive these changes.";
   }
-
-  clearFailures(client);
-  const expiresAt = Date.now() + SESSION_DAYS * 86_400_000;
-  const token = await signSession(env, email, expiresAt);
-  // A session must not sit in any cache on the way back.
-  return json({ email, token, expiresAt, days: SESSION_DAYS }, 200, {
-    "cache-control": "no-store",
-  });
+  return "Admin commands:\n/stats [days]\n/about\n/settitle text\n/settagline text\n/setabout text (blank lines separate paragraphs)\n/setcontact text\n/donation [on|off]\n/setupi handle@bank\n/setdonorname name\n/help";
 }
