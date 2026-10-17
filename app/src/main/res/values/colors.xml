@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Only used before Compose draws its first frame; must match the
+         backgrounds in ui/theme/Theme.kt so the launch screen does not flash a
+         different shade than the app. -->
+    <color name="app_background_light">#FFF5F6FB</color>
+    <color name="app_background_dark">#FF0D0F1A</color>
+</resources>

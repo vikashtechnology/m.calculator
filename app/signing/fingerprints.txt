@@ -1,0 +1,18 @@
+M Calculator signing certificate fingerprints
+=============================================
+
+Keystore : app/signing/mcalculator.p12
+Alias    : mcalculator
+Password : mcalculator (store and key)
+
+SHA-1   : 8D:0F:7B:E8:E5:41:0D:08:7E:69:17:3C:61:DC:2D:D5:03:3B:75:BD
+SHA-256 : 0E:17:F0:81:49:3D:E9:20:F8:2F:F7:93:FF:72:67:D3:AB:A9:7D:34:50:92:B6:5B:A5:94:A1:AE:05:14:7D:71
+
+Register the SHA-1 in the Google Cloud / Firebase console so that
+'Continue with Google' works in the app:
+  1. console.cloud.google.com > APIs & Services > Credentials
+  2. Create an OAuth client ID of type Android
+     package name: com.advanceai.calculator
+     SHA-1: the line above
+  3. Create an OAuth client ID of type Web (this becomes the
+     'googleWebClientId' build property used by the app).

@@ -1,0 +1,200 @@
+name: Android CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # needed to publish the installable APK as a release
+  issues: write # needed to report build failures
+
+jobs:
+  build:
+    name: Test and build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        run: |
+          set -e
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          if [ ! -d "$SDK" ]; then SDK=/usr/local/lib/android/sdk; fi
+          echo "Using Android SDK at $SDK"
+          ls "$SDK" || true
+          SDKMANAGER="$(find "$SDK" -name sdkmanager -type f 2>/dev/null | head -n 1 || true)"
+          echo "sdkmanager: $SDKMANAGER"
+          if [ -n "$SDKMANAGER" ]; then
+            yes | "$SDKMANAGER" --sdk_root="$SDK" --licenses > /dev/null 2>&1 || true
+            "$SDKMANAGER" --sdk_root="$SDK" "platforms;android-36" "build-tools;36.0.0" || true
+          fi
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests (math engine)
+        id: tests
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          mkdir -p ci-logs
+          ./gradlew testDebugUnitTest --stacktrace --continue 2>&1 | tee ci-logs/unit-tests.log
+
+      - name: Check the theme
+        run: python3 tools/check_theme.py
+
+      - name: Check the dashboard worker
+        run: |
+          if command -v node >/dev/null 2>&1; then
+            ./tools/run_worker_tests.sh
+          else
+            echo "node is not available; skipping the worker checks"
+          fi
+
+      - name: Build debug and release APKs, and the Play bundle
+        id: apk
+        continue-on-error: true
+        env:
+          # Optional: the Cloudflare Worker URL from admin/worker. Without it the
+          # anonymous usage counters stay on the device.
+          TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
+          # Optional: bump this before each Play upload (Play rejects a repeated
+          # versionCode). Settings → Secrets and variables → Actions → Variables.
+          PLAY_VERSION_CODE: ${{ vars.PLAY_VERSION_CODE }}
+        run: |
+          set -o pipefail
+          GRADLE_ARGS=""
+          echo "Ask AI: each user pastes their own free key in the app (Groq by"
+          echo "default), so no credential is compiled into this APK."
+          if [ -n "$TELEMETRY_URL" ]; then
+            GRADLE_ARGS="$GRADLE_ARGS -PtelemetryUrl=$TELEMETRY_URL"
+            echo "Usage stats: enabled ($TELEMETRY_URL)"
+          else
+            echo "Usage stats: off (no TELEMETRY_URL secret)"
+          fi
+          if [ -n "$PLAY_VERSION_CODE" ]; then
+            GRADLE_ARGS="$GRADLE_ARGS -PversionCode=$PLAY_VERSION_CODE"
+            echo "Play versionCode: $PLAY_VERSION_CODE"
+          fi
+          ./gradlew assembleDebug assembleRelease bundleRelease --stacktrace $GRADLE_ARGS 2>&1 | tee ci-logs/assemble.log
+
+      - name: Upload the APK and the Play bundle
+        if: steps.apk.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: m-calculator-build
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+      - name: Publish the APK and the bundle as the "latest-build" release
+        # app-release.apk is what you install on a phone; app-release.aab is what
+        # you upload to Google Play. Both come from the same build, on main, on
+        # manual runs, and for preview builds made from agent branches.
+        if: >-
+          steps.apk.outcome == 'success' &&
+          (github.event_name == 'workflow_dispatch' ||
+           github.ref == 'refs/heads/main' ||
+           startsWith(github.ref_name, 'arena/'))
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          NOTES="AI Calculator build ${GITHUB_SHA:0:7} ($GITHUB_REF_NAME). app-release.apk is the installable app; app-release.aab is the Google Play upload."
+          FLAGS=""
+          if [ "$GITHUB_REF_NAME" != "main" ]; then FLAGS="--prerelease"; fi
+          if gh release view latest-build > /dev/null 2>&1; then
+            gh release upload latest-build app/build/outputs/apk/release/*.apk \
+              app/build/outputs/bundle/release/*.aab --clobber
+            gh release edit latest-build --notes "$NOTES" $FLAGS
+          else
+            gh release create latest-build \
+              --title "AI Calculator — latest build" \
+              --notes "$NOTES" $FLAGS \
+              app/build/outputs/apk/release/*.apk \
+              app/build/outputs/bundle/release/*.aab
+          fi
+
+      - name: Publish test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
+          if-no-files-found: ignore
+
+      - name: Report failures in an issue
+        if: steps.tests.outcome == 'failure' || steps.apk.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          TITLE="CI failure (${GITHUB_REF_NAME})"
+          {
+            echo "Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Commit: $GITHUB_SHA"
+            echo
+            echo "Unit tests: ${{ steps.tests.outcome }} — APK build: ${{ steps.apk.outcome }}"
+            echo
+            echo '## Errors'
+            echo '```'
+            grep -h -E "^(e|w): |error: |What went wrong|Execution failed for task|FAILURE: Build|Caused by: [a-z]|\* Try|\* What went wrong|AAPT" ci-logs/*.log 2>/dev/null \
+              | sed -E 's#file:///home/runner/work/m.calculator/m.calculator/##' \
+              | sort -u | head -200
+            echo '```'
+            echo
+            echo '## Failing tests'
+            echo '```'
+            grep -h -E "<testcase|<failure|<error" app/build/test-results/testDebugUnitTest/*.xml 2>/dev/null | head -c 20000
+            echo '```'
+            echo '## Failure details'
+            echo '```'
+            grep -h -A 12 -E "<failure|<error" app/build/test-results/testDebugUnitTest/*.xml 2>/dev/null | head -c 40000
+            echo '```'
+            echo '## Build log tail'
+            echo '```'
+            tail -c 20000 ci-logs/unit-tests.log 2>/dev/null
+            echo '```'
+            echo '## Assemble log tail'
+            echo '```'
+            tail -c 12000 ci-logs/assemble.log 2>/dev/null
+            echo '```'
+          } > ci-failure.md || true
+          BODY="$(head -c 60000 ci-failure.md)"
+          EXISTING="$(gh issue list --state open --search "CI failure in:title" --json number --jq '.[0].number' 2>/dev/null)"
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY" || true
+          else
+            gh issue create --title "$TITLE" --body "$BODY" || true
+          fi
+
+      - name: Close the CI failure issue when the build is green
+        if: steps.tests.outcome == 'success' && steps.apk.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          NUMBERS="$(gh issue list --state open --search 'CI failure in:title' --json number --jq '.[].number')"
+          for n in $NUMBERS; do
+            gh issue close "$n" --comment "Build is green again (run ${GITHUB_RUN_ID}), closing automatically." || true
+          done
+
+      - name: Fail the job if anything failed
+        if: steps.tests.outcome == 'failure' || steps.apk.outcome == 'failure'
+        run: exit 1

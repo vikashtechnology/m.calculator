@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- The maths engine is 100% offline and needs no permissions. INTERNET is
+         used by "Ask AI", which talks to the AI service the user pasted a key
+         for (Groq by default), and by the AdMob banner; CAMERA,
+         POST_NOTIFICATIONS and RECORD_AUDIO belong to the Ask AI screen. -->
+    <!-- Ask AI: dictate a question. The phone's own speech recogniser turns the
+         voice into text; the app records nothing and keeps no audio. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Ask AI: photograph a question in the app. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Ask AI: tell the user when a question has been solved. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- A tablet or an emulator without a camera can still use everything else. -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.any"
+        android:required="false" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.MCalculator">
+        <!-- AdMob app ID. The ads SDK itself is handed this ID in code, but the
+             consent (UMP) SDK reads it from here, so both must match. The value
+             comes from gradle.properties (admobAppId), or Google's test app ID
+             when that property is not set. -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="${admobAppId}" />
+
+        <!-- Lets the camera write the photo it takes for Ask AI. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode|density|fontScale"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.MCalculator"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Share a sum or a question to the app from any other app: the
+                 pad calculates it, or Ask AI answers it. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <!-- Opening a calculator link (a "calc:" URI) lands on the pad. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="calc" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
