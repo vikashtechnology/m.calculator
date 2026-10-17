@@ -1,0 +1,139 @@
+/* The same look as the dashboard the Worker serves, so the two feel like one
+   thing whichever address you open. */
+
+:root {
+  color-scheme: dark;
+  --bg: #141218;
+  --panel: #211f26;
+  --line: #332f39;
+  --text: #e7e0ec;
+  --muted: #a49fac;
+  --accent: #d0bcff;
+  --on-accent: #241a3d;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0 auto;
+  max-width: 760px;
+  padding: 22px 18px 60px;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 16px; margin: 0 0 10px; }
+
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+p { margin: 8px 0; }
+a { color: var(--accent); }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+.cards {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  margin: 16px 0;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.card .k { font-size: 24px; font-weight: 600; }
+.card .t { color: var(--muted); font-size: 13px; }
+
+/* The chart: one bar per day, the tallest at 110px. */
+.chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 120px;
+  padding-top: 4px;
+  border-bottom: 1px solid var(--line);
+}
+.chart > div {
+  flex: 1 1 0;
+  min-width: 2px;
+  background: var(--accent);
+  border-radius: 3px 3px 0 0;
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 500; }
+
+/* Nothing may be stranded below the fold: wide tables scroll themselves. */
+.scroll { overflow-x: auto; }
+
+input, textarea, select {
+  font: inherit;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #1b1920;
+  color: var(--text);
+  width: 100%;
+}
+select { width: auto; }
+
+label {
+  display: block;
+  margin: 12px 0 3px;
+  color: var(--muted);
+  font-size: 13px;
+}
+label.inline { display: inline; margin: 0; }
+label.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 16px;
+  color: var(--text);
+  font-size: 15px;
+}
+label.check input { width: auto; }
+
+button {
+  font: inherit;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+button:disabled { opacity: 0.55; cursor: default; }
+button.quiet { background: var(--line); color: var(--text); font-weight: 500; }
+
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+
+.status { min-height: 1.2em; color: var(--muted); font-size: 13px; }
+
+footer { margin-top: 28px; border-top: 1px solid var(--line); padding-top: 12px; }
+
+@media (max-width: 420px) {
+  header { flex-direction: column; }
+  .card .k { font-size: 21px; }
+}

@@ -165,10 +165,11 @@ Optional build properties:
 ```
 
 ### Usage dashboard (optional)
-`admin/worker` holds a Cloudflare Worker that serves a small read-only dashboard:
-installs, active users (today / week / range) and calculations and AI questions
-per day, with a per-day table and chart. One D1 database, no other service, and
-the whole setup is one command:
+`admin/worker` holds the Cloudflare Worker and the D1 database behind a small
+read-only dashboard: installs, active users (today / week / range) and
+calculations and AI questions per day, with a per-day table and chart. The
+dashboard page itself is `admin/web`, published free by GitHub Pages, so the
+Worker stays an API and the page can be opened from any browser.
 
 There are two ways to set it up: entirely in the Cloudflare dashboard — see
 [`admin/WEB_SETUP.md`](admin/WEB_SETUP.md), where the Worker even creates its own
@@ -192,10 +193,25 @@ a random per-install id: no expressions, results, files or accounts. The switch
 
 **☰ → About AI Calculator** shows the app icon, the version, and text that comes
 from the stats Worker (`GET /v1/about`) — the same dashboard has a panel that
-saves it (`PUT /v1/about`, admin token), so the wording, the paragraphs and the
+saves it (`PUT /v1/about`, admin sign-in), so the wording, the paragraphs and the
 links change without a new APK. The last copy that arrived is kept on the phone,
 so the page works offline; with nothing saved yet it shows the bundled text.
 `admin/WEB_SETUP.md` walks through editing it.
+
+The About page also carries a **donate card** — a QR code, the UPI id and a
+button that hands the payment link to whichever UPI app is installed — shown only
+while the dashboard has it switched on. The QR is generated on the phone from the
+UPI id the dashboard supplies, so changing the id changes the code. See
+`admin/WEB_SETUP.md`.
+
+The dashboard is `admin/web` — four static files — published by GitHub Pages at
+`https://vikkiroy899.github.io/m.calculator/`. It holds nothing itself: signing in
+goes to the Worker (`POST /v1/login`), and the session it gets back travels in an
+`Authorization` header, because a cookie across `github.io` and `workers.dev`
+would be a third-party cookie and browsers drop those. There is no token in the
+address bar, and changing the password is a Worker secret
+(`ADMIN_PASSWORD_HASH`), never a line in this repository. The Worker's own
+address forwards to the page. See `admin/WEB_SETUP.md`.
 
 ## What the calculator shows when it opens
 
@@ -235,9 +251,10 @@ one that serves real ads (see `buildTypes { debug { … } }` in
 `app/build.gradle.kts`).
 
 Each step reports itself, so "there is no ad" can be told apart from "the ads are
-broken": **☰ → Settings → Ads** shows the current state and the units in use, the
-same messages go to logcat under the `Ads` tag, and `PLAY.md` has a table of what
-each state means and how to check the AdMob console.
+broken". In a **debug build**, **☰ → Settings → Ad diagnostics** shows the current
+state and the units in use; the same messages go to logcat under the `Ads` tag,
+and `PLAY.md` has a table of what each state means. A **release build shows
+nothing about ads in the UI at all** — that text is ours, not the user's.
 
 ## Look and feel
 
@@ -247,6 +264,12 @@ messages carry soft shadows so the surfaces read as layers rather than flat
 blocks: the readout sits on a raised card, keypad keys are physical buttons, the
 menu and the chat header are elevated sheets, and chat bubbles lift off the chat
 background.
+
+**Keys respond like keys.** A key sinks into the pad while a finger is on it and
+springs back when released (a 60 ms press, a short bounce up), and the shadow
+under it flattens as it goes down. Each new answer lands with its own small
+spring from the right edge of the readout. Both are drawing-only transforms, so
+the keypad keeps its exact geometry and the readout keeps its measured size.
 
 The pad holds still: the keypad is laid out at one size — measured for the page
 with the most keys, so switching pages and an ad appearing both change nothing —
@@ -302,7 +325,8 @@ app/src/main/java/com/advanceai/calculator/
 │   └── screens/     pad, graph, solver, matrix, units, stats, Ask AI, everyday tools
 └── MainActivity.kt
 app/signing/         the key every build is signed with + its fingerprints
-admin/worker/        the Cloudflare Worker that serves the usage dashboard
+admin/worker/        the Cloudflare Worker + D1 behind the usage dashboard
+admin/web/           the dashboard page itself (GitHub Pages)
 app/src/test/        JUnit suite for the engine
 tools/               icon generator and the Python reference oracle
 ```

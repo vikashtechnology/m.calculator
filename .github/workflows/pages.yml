@@ -1,0 +1,57 @@
+name: Admin page (GitHub Pages)
+
+# Publishes admin/web — the browser copy of the admin dashboard — as a GitHub
+# Pages site. Once, in the repository: Settings → Pages → Build and deployment
+# → Source: **GitHub Actions**. After that every change here republishes it.
+#
+# The page holds no data. It signs in to the Cloudflare Worker declared in
+# admin/web/config.js and reads the numbers from there, so this workflow needs
+# no secrets, and nothing about the dashboard is stored in the repository.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "admin/web/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a newer push replaces a queued one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Set up Pages
+        uses: actions/configure-pages@v5
+        with:
+          # Creates the Pages site if it does not exist yet. If the account or
+          # plan does not allow that, turn Pages on by hand once:
+          # Settings → Pages → Source: GitHub Actions.
+          enablement: true
+
+      - name: Check the page
+        run: python3 tools/check_admin_web.py
+
+      - name: Upload the page
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: admin/web
+
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@v4

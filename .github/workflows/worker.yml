@@ -8,7 +8,8 @@ name: Dashboard worker
 #   secret  CLOUDFLARE_API_TOKEN   "Edit Cloudflare Workers" template token
 #   secret  CLOUDFLARE_ACCOUNT_ID  Cloudflare dashboard → Workers → account id
 #   variable D1_DATABASE_ID        from: npx wrangler d1 create m_calculator_stats
-#   secret  ADMIN_TOKEN            the dashboard password
+#   secret  ADMIN_EMAIL            the address that signs in to the dashboard
+#           ADMIN_PASSWORD_HASH    node admin/worker/hash-password.mjs '…'
 #
 # Setup itself (database, schema, secrets) is one command: admin/worker/setup.sh
 
@@ -33,7 +34,8 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
-      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      ADMIN_PASSWORD_HASH: ${{ secrets.ADMIN_PASSWORD_HASH }}
     steps:
       - name: Check out sources
         uses: actions/checkout@v4
@@ -48,7 +50,7 @@ jobs:
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "No CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID yet — skipping."
             echo "Run admin/worker/setup.sh once (see admin/README.md) and add:"
-            echo "  secrets  CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ADMIN_TOKEN"
+            echo "  secrets  CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ADMIN_EMAIL, ADMIN_PASSWORD_HASH"
             echo "  variable D1_DATABASE_ID"
           fi
 
@@ -75,10 +77,14 @@ jobs:
         working-directory: admin/worker
         run: npx --yes wrangler@3 d1 execute m_calculator_stats --remote --file=schema.sql || true
 
-      - name: Store the admin token
-        if: steps.creds.outputs.ready == 'true' && env.ADMIN_TOKEN != ''
+      - name: Store the admin sign-in
+        if: steps.creds.outputs.ready == 'true' && env.ADMIN_PASSWORD_HASH != ''
         working-directory: admin/worker
-        run: printf '%s' "$ADMIN_TOKEN" | npx --yes wrangler@3 secret put ADMIN_TOKEN
+        run: |
+          if [ -n "$ADMIN_EMAIL" ]; then
+            printf '%s' "$ADMIN_EMAIL" | npx --yes wrangler@3 secret put ADMIN_EMAIL
+          fi
+          printf '%s' "$ADMIN_PASSWORD_HASH" | npx --yes wrangler@3 secret put ADMIN_PASSWORD_HASH
 
       - name: Deploy
         id: deploy

@@ -587,7 +587,7 @@ private fun DropDownMenuPanel(
             MenuRow(
                 icon = Icons.Filled.Tune,
                 title = "Settings",
-                detail = "Digits shown, digit grouping, key feedback, ads",
+                detail = "Digits shown, digit grouping, key feedback",
                 onClick = onOpenSettings
             )
             MenuRow(

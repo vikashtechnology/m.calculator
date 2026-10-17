@@ -1,5 +1,8 @@
 package com.advanceai.calculator.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
@@ -73,6 +78,23 @@ fun DisplayPanel(
     val colors = MaterialTheme.colorScheme
     val scroll = rememberScrollState()
     var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
+
+    // Each new answer lands with a short spring, as if it had been typed out
+    // and dropped into place. It is a graphics transform only, so the text is
+    // still measured normally and cannot be pushed out of the panel.
+    val resultPop = remember { Animatable(1f) }
+    LaunchedEffect(state.resultText) {
+        if (state.resultText.isNotEmpty()) {
+            resultPop.snapTo(0.94f)
+            resultPop.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            )
+        }
+    }
 
     var fieldValue by remember {
         mutableStateOf(TextFieldValue(state.expression, TextRange(state.cursor.coerceIn(0, state.expression.length))))
@@ -270,7 +292,15 @@ fun DisplayPanel(
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.End,
                         maxLines = 3,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                // Pops out from the right edge, where the eye is
+                                // already reading the newest digits.
+                                transformOrigin = TransformOrigin(1f, 0.5f)
+                                scaleX = resultPop.value
+                                scaleY = resultPop.value
+                            }
                     )
                     state.fractionHint?.let { hint ->
                         Text(

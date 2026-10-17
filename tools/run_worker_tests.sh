@@ -12,15 +12,15 @@ import sys
 worker_path = pathlib.Path("admin/worker/worker.js")
 worker = worker_path.read_text()
 
-# 1. module under test: the Worker with the two big HTML templates replaced by
-#    markers, so the test file stays about behaviour rather than markup.
+# 1. module under test: the Worker with its one big HTML template (the privacy
+#    policy) replaced by a marker, so the test file stays about behaviour rather
+#    than markup. The dashboard is not in the Worker any more — it is admin/web.
 def stub(module, name, marker):
     start = module.index(f"const {name} = `") + len(f"const {name} = `")
     end = module.index("`;", start)
     return module[:start - len(f"const {name} = `")] + f"const {name} = '{marker}';\n" + module[end + 2:]
 
-module = stub(worker, "DASHBOARD_HTML", "<html>ok</html>")
-module = stub(module, "PRIVACY_HTML", "<html>privacy</html>")
+module = stub(worker, "PRIVACY_HTML", "<html>privacy</html>")
 pathlib.Path("admin/worker/test/module-under-test.mjs").write_text(module)
 
 
@@ -56,5 +56,8 @@ if a != b:
     sys.exit(1)
 print(f"schema: worker.js and schema.sql agree ({len(a)} statements)")
 PY
+
+# the GitHub Pages copy of the dashboard is plain files, so check it here too
+python3 tools/check_admin_web.py
 
 node admin/worker/test/worker.test.mjs

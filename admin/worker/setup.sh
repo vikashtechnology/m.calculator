@@ -4,7 +4,7 @@
 #
 #   cd admin/worker
 #   ./setup.sh                     # asks for the admin password, then deploys
-#   ADMIN_TOKEN=my-long-password ./setup.sh
+#   ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='a long password' ./setup.sh
 #
 # It logs you in to Cloudflare (a browser opens once), creates the database if
 # needed, writes its id into wrangler.toml, applies schema.sql, sets the admin
@@ -17,7 +17,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
 
 DB_NAME="m_calculator_stats"
-ADMIN_TOKEN="${ADMIN_TOKEN:-}"
+ADMIN_EMAIL="${ADMIN_EMAIL:-rajkatrina90@gmail.com}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 
 say()  { printf '\033[1;35m▸\033[0m %s\n' "$1"; }
 ok()   { printf '\033[1;32m✓\033[0m %s\n' "$1"; }
@@ -78,13 +79,17 @@ npx --yes wrangler@3 d1 execute "$DB_NAME" --remote --file=schema.sql >/dev/null
 ok "Tables ready"
 
 # ---- 5. the admin password ---------------------------------------------------
-if [ -z "$ADMIN_TOKEN" ]; then
-  read -r -s -p "Choose the dashboard password (admin token): " ADMIN_TOKEN
+if [ -z "$ADMIN_PASSWORD" ]; then
+  read -r -s -p "Choose the dashboard password (at least 8 characters): " ADMIN_PASSWORD
   echo
 fi
-[ "${#ADMIN_TOKEN}" -ge 12 ] || die "Use at least 12 characters for the admin token."
-printf '%s' "$ADMIN_TOKEN" | npx --yes wrangler@3 secret put ADMIN_TOKEN >/dev/null
-ok "ADMIN_TOKEN stored as a Worker secret"
+[ "${#ADMIN_PASSWORD}" -ge 8 ] || die "Use at least 8 characters for the password."
+
+say "Storing the sign-in as Worker secrets…"
+PASSWORD_HASH="$(node "$HERE/hash-password.mjs" "$ADMIN_PASSWORD")"
+printf '%s' "$ADMIN_EMAIL" | npx --yes wrangler@3 secret put ADMIN_EMAIL >/dev/null
+printf '%s' "$PASSWORD_HASH" | npx --yes wrangler@3 secret put ADMIN_PASSWORD_HASH >/dev/null
+ok "ADMIN_EMAIL and ADMIN_PASSWORD_HASH stored (the password itself is never stored)"
 
 # ---- 6. deploy ---------------------------------------------------------------
 say "Deploying the Worker…"
@@ -106,13 +111,16 @@ fi
 cat << EOF
 
 ────────────────────────────────────────────────────────────────────────
-Dashboard:      $WORKER_URL
-Admin token:    (the password you chose)
-Health check:   $WORKER_URL/health
+Worker (the API):  $WORKER_URL
+Health check:      $WORKER_URL/health
+Account:           $ADMIN_EMAIL (password: the one you chose)
 
-Now switch the app's numbers on — two things in GitHub:
+Two more things in GitHub:
   Settings → Secrets and variables → Actions → New repository secret
       TELEMETRY_URL = $WORKER_URL
+  Settings → Pages → Build and deployment → Source: GitHub Actions
+      then Actions → "Admin page (GitHub Pages)" → Run workflow
+The dashboard appears at https://<your-github-name>.github.io/m.calculator/
 
 Then run the Android CI again (or push any commit) and install the APK.
 The dashboard will start filling in as people use the app.

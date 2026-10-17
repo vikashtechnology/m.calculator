@@ -22,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.advanceai.calculator.BuildConfig
 import com.advanceai.calculator.ads.Ads
 import com.advanceai.calculator.data.AppSettings
 import com.advanceai.calculator.engine.DigitGrouping
@@ -110,39 +111,31 @@ fun SettingsSheet(
             )
 
             // --- ads ----------------------------------------------------------
-            SettingTitle(
-                "Ads",
-                "One banner at the bottom of the calculator, from Google AdMob. " +
-                    "This line says whether it is showing."
-            )
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+            // The ad diagnostics (status line, unit ids, no-fill notes) are for
+            // us, not for the person using the calculator: a release build says
+            // nothing about AdMob at all. They stay in a debug build so a
+            // banner can still be checked on the phone.
+            if (BuildConfig.DEBUG) {
+                SettingTitle(
+                    "Ad diagnostics (debug build only)",
+                    "Not shown to anyone using a release build."
+                )
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    contentColor = MaterialTheme.colorScheme.onSurface,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(
-                        text = Ads.status,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Units in this build: ${Ads.unitSummary}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Banner unit: ${Ads.bannerUnit}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (Ads.status.startsWith("No ad right now")) {
+                    Column(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
                         Text(
-                            text = "A brand-new AdMob app often answers like this for a day or " +
-                                "two before ads start serving. Nothing to fix.",
+                            text = Ads.status,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "Units in this build: ${Ads.unitSummary}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -151,9 +144,8 @@ fun SettingsSheet(
             }
 
             Text(
-                text = "Results always keep the full 12-digit precision internally; " +
-                    "these settings only change what you read on screen. Angle mode, " +
-                    "memory and the theme are in the menu.",
+                text = "These only change what you read on screen — the maths behind " +
+                    "them is always exact. Angle mode and the theme are in the menu.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 10.dp)

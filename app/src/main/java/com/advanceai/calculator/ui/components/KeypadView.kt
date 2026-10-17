@@ -1,5 +1,10 @@
 package com.advanceai.calculator.ui.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,14 +14,20 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -122,19 +133,63 @@ private fun KeyButton(
     val activeContainer = if (useAlt && key.style == KeyStyle.FUNCTION) colors.secondaryContainer else container
     val activeContent = if (useAlt && key.style == KeyStyle.FUNCTION) colors.onSecondaryContainer else content
 
+    // --- the press animation -------------------------------------------
+    // A key sinks into the pad while a finger is on it and springs back when
+    // let go, the way a physical key behaves. `pressed` is set from the gesture
+    // itself (not from the click), so it tracks a finger that slides off, a
+    // long press, and a cancelled touch alike.
+    var pressed by remember { mutableStateOf(false) }
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.93f else 1f,
+        // Down is quick and linear; up overshoots very slightly, which is the
+        // "click" the eye reads even before the digit appears.
+        animationSpec = if (pressed) {
+            tween(durationMillis = 60)
+        } else {
+            spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessHigh)
+        },
+        label = "keyPressScale"
+    )
+    val pressLift by animateDpAsState(
+        targetValue = if (pressed) 1.5.dp else 0.dp,
+        animationSpec = tween(durationMillis = if (pressed) 60 else 140),
+        label = "keyPressLift"
+    )
+    val flatKey = key.style == KeyStyle.FUNCTION
+    val pressShadow by animateDpAsState(
+        targetValue = if (pressed || flatKey) 0.dp else 2.dp,
+        animationSpec = tween(durationMillis = 90),
+        label = "keyPressShadow"
+    )
+
     Surface(
         color = activeContainer,
         contentColor = activeContent,
         shape = RoundedCornerShape(16.dp),
-        tonalElevation = if (key.style == KeyStyle.FUNCTION) 0.dp else 2.dp,
-        // A soft shadow makes the keys read as physical buttons in both themes.
-        shadowElevation = if (key.style == KeyStyle.FUNCTION) 0.dp else 2.dp,
-        modifier = modifier.pointerInput(key.id, second) {
-            detectTapGestures(
-                onTap = { onClick() },
-                onLongPress = { onLongClick() }
-            )
-        }
+        tonalElevation = if (flatKey) 0.dp else 2.dp,
+        // A soft shadow makes the keys read as physical buttons in both themes;
+        // it flattens as the key is pushed in.
+        shadowElevation = pressShadow,
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .offset(y = pressLift)
+            .pointerInput(key.id, second) {
+                detectTapGestures(
+                    onPress = {
+                        pressed = true
+                        try {
+                            tryAwaitRelease()
+                        } finally {
+                            pressed = false
+                        }
+                    },
+                    onTap = { onClick() },
+                    onLongPress = { onLongClick() }
+                )
+            }
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(

@@ -43,9 +43,10 @@ Do **not** run anything in the Console tab; the Worker creates the tables itself
 
 ## 4. Paste the Worker code
 
-1. Open this file on GitHub and copy **all** of it:
+1. Copy **all** of `admin/worker/worker.js` — the file in this project, or on
+   GitHub:
 
-   <https://github.com/vikashtechnology/m.calculator/blob/arena/06e942f0-m-calculator/admin/worker/worker.js>
+   <https://github.com/vikkiRoy899/m.calculator/blob/main/admin/worker/worker.js>
 
    Use **Copy raw file** (the icon beside the *Raw* button), or open the *Raw*
    view and select everything with `Ctrl+A` / `Cmd+A`, then copy.
@@ -63,40 +64,39 @@ Do **not** run anything in the Console tab; the Worker creates the tables itself
 2. Select **Add** (or **Add variable**).
 3. **Type: Secret** (important — a plain text variable is readable by anyone
    with access to the account).
-4. **Name: `ADMIN_TOKEN`** — exactly.
-5. **Value:** the password you want for the dashboard, 12 characters or more.
-   Save it in your password manager; it is never shown again.
-6. Select **Save** / **Deploy** so the Worker runs with the new secret.
+4. **Name: `ADMIN_PASSWORD_HASH`** — exactly.
+5. **Value:** the output of `node admin/worker/hash-password.mjs 'your password'`
+   (it starts with `pbkdf2$`). The password itself is never stored — not here,
+   not in the database, not in this repository.
+6. **Add** a second secret, **`ADMIN_EMAIL`**, if the address that signs in is not
+   the built-in `rajkatrina90@gmail.com`.
+7. Select **Save** / **Deploy** so the Worker runs with the new secrets.
 
-## 6. Check it, then open the dashboard
+## 6. Check the Worker
 
-1. Open `https://ai-calculator-stats.<your-subdomain>.workers.dev/health`
-   (use your Worker's own URL).
+Open `https://ai-calculator-stats.<your-subdomain>.workers.dev/health` (use your
+Worker's own URL). This is the setup checklist, and it also creates the tables.
+You want:
 
-   This is the setup checklist, and it also creates the tables. You want:
+```json
+{
+  "ok": true,
+  "service": "AI Calculator stats",
+  "database": "ok",
+  "schema": "ready",
+  "signIn": { "method": "email and password; the session goes in an Authorization header",
+              "email": "rajkatrina90@gmail.com", "customPassword": true,
+              "customSessionKey": false }
+}
+```
 
-   ```json
-   {
-     "ok": true,
-     "service": "AI Calculator stats",
-     "database": "ok",
-     "schema": "ready",
-     "secrets": { "ADMIN_TOKEN": true, "GEMINI_API_KEY": false, "GOOGLE_WEB_CLIENT_ID": false }
-   }
-   ```
+* `"ok": false` with `"database": "error: … Cannot read properties of undefined"` →
+  the binding is missing or misnamed: it must be the variable name **DB** (step 3).
+* `"customPassword": false` → the built-in password is still in use. It works,
+  but set `ADMIN_PASSWORD_HASH` (step 5) before showing the dashboard to anyone.
 
-   * `"ok": false` with `"database": "error: … Cannot read properties of undefined"` → the
-     binding is missing or misnamed: it must be the variable name **DB** (step 3).
-   * `"ADMIN_TOKEN": false` → the secret is not set on the deployed version yet
-     (step 5); re-deploy afterwards.
-
-2. Open the Worker's root URL: `https://ai-calculator-stats.<your-subdomain>.workers.dev/`
-3. Type your admin token into the box and select **Load**. The page remembers it
-   in this browser only, and shows installs, active users, and calculations and
-   AI questions per day. Until the app reports, everything reads 0.
-
-**Nothing else is needed for the dashboard itself.** Steps 7 and 8 are what make
-the *app* send numbers.
+The Worker is an API: it answers JSON and holds the data. The dashboard itself is
+a page on GitHub Pages, and step 7 puts it there.
 
 ### Editing the app's About page
 
@@ -106,8 +106,7 @@ app:
 1. Scroll to the panel headed **About page (shown inside the app)**.
 2. Type the title, the tagline, the paragraphs (one per line), any links (one per
    line as `Label | https://address`) and a support email.
-3. Select **Save the About page** — the token box at the top of the page is the
-   one it uses; if you have not entered it yet, enter it there first.
+3. Select **Save the About page**. It saves as the account you signed in with.
 4. In the app: **☰ → About AI Calculator → Refresh**. The new text appears. The
    app also keeps the last copy it downloaded, so the page reads correctly with
    no connection.
@@ -121,33 +120,105 @@ Notes:
   trimmed to sensible lengths — the page inside the app cannot be made to do
   anything odd from here.
 * Leaving the boxes empty restores the built-in wording.
-* `GET /v1/about` is public (the app reads it without a token); saving needs the
-  admin token, exactly like the stats.
+* `GET /v1/about` is public (the app reads it without signing in); saving needs
+  the admin session, exactly like the stats.
+
+#### The donate button
+
+The same panel has a **donate** block:
+
+* **Show the donate button in the app** — uncheck it and the card disappears from
+  the app's About page entirely.
+* **Donate UPI id** — the address a UPI app pays to, in the form `name@bank`
+  (here `vikashraoa2343-1@oksbi`). The app builds the payment link and draws the
+  QR code from this id, so changing it here changes the code as well; there is no
+  picture to replace.
+* **Donate name** — what the payer's UPI app shows as the recipient.
+
+A value that is not a plausible UPI id is refused rather than saved — a typo
+would send money nowhere. Switching the button off keeps the id, so it can be
+switched back on later.
+
+QR codes are drawn black on white in both themes on purpose: a camera has to read
+them. A pre-generated copy of the same code is in `assets/donate-qr.png` (it
+encodes `upi://pay?pa=vikashraoa2343-1@oksbi&pn=AI%20Calculator&cu=INR`) for
+printing or posting outside the app.
 
 ### If the dashboard will not let you in
 
-* **It keeps asking for the token.** The token is remembered in the browser you
-  typed it into and nowhere else, so a new phone, a different browser or cleared
-  site data means typing it again.
-* **It says "That token was not accepted."** Either it is not the token this
-  Worker was given, or the `ADMIN_TOKEN` secret was changed afterwards.
-  Cloudflare never shows a secret back, so the way forward is to set a new one:
-  **Workers & Pages → your Worker → Settings → Variables and Secrets →
-  `ADMIN_TOKEN` → Edit**, save a new value, then type that value in. `/health`
-  is worth a look as well — it reports `"ADMIN_TOKEN": true` when the secret is
-  in place.
+* **It keeps asking me to sign in.** The session is kept by the page in that tab
+  only, so a new tab, a new browser or a reload of the same tab after it was
+  closed means signing in again. Sessions last 30 days at most.
+* **It says "That email and password do not match."** Either the password is not
+  the one this Worker was given, or `ADMIN_PASSWORD_HASH` / `ADMIN_EMAIL` were
+  changed afterwards. Set a new one: `node admin/worker/hash-password.mjs 'new
+  password'`, then **Workers & Pages → your Worker → Settings → Variables and
+  Secrets → `ADMIN_PASSWORD_HASH` → Edit**. `/health` reports
+  `"customPassword": true` when a hash of your own is in place, and
+  `"customPassword": false` when the built-in account is still being used.
+* **Too many attempts.** Eight wrong attempts from one address in ten minutes
+  are refused for the rest of that window — that is the brute-force guard, not a
+  fault.
 * **You wanted to change the Worker code but the editor is read-only.** That
   means this Worker was last deployed from a terminal or from the GitHub Action
   rather than pasted in by hand; Cloudflare does not allow hand-editing those.
   Use the same route that deployed it (Actions → **Dashboard worker** → *Run
   workflow*), which deploys `admin/worker/worker.js` from the repository.
 * **Which version is live?** `GET /health` lists the endpoints the deployed
-  Worker knows. If `/v1/about` is not in that list, the deployed copy is older
-  than the About editor — paste `worker.js` again (step 4) or run the action.
+  Worker knows. If `/v1/login` is not in that list, the deployed copy is older
+  than the dashboard page — paste `worker.js` again (step 4) or run the action.
+* **No browser works at all?** The API is plain JSON, so `curl` is the way in:
 
-## 7. Point the app at it (GitHub, one field)
+  ```bash
+  TOKEN=$(curl -s -X POST https://<your-worker>.workers.dev/v1/login \
+    -H 'content-type: application/json' \
+    -d '{"email":"rajkatrina90@gmail.com","password":"…"}' \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])')
+  curl -s -H "authorization: Bearer $TOKEN" 'https://<your-worker>.workers.dev/v1/stats?days=30'
+  ```
 
-1. Open <https://github.com/vikashtechnology/m.calculator/settings/secrets/actions>
+## 7. Publish the dashboard on GitHub Pages
+
+The dashboard is four static files in `admin/web`, and GitHub Pages serves them.
+It holds no data: it signs in to the Worker and reads everything from there.
+
+1. In the repository: **Settings → Pages → Build and deployment → Source:
+   GitHub Actions**.
+2. **Actions → Admin page (GitHub Pages) → Run workflow**. The page appears at
+
+   ```
+   https://vikkiroy899.github.io/m.calculator/
+   ```
+
+   After that, every change under `admin/web/` republishes it.
+3. If your Worker is at a different address from the one in
+   `admin/web/config.js`, change that one line (no trailing slash) and run the
+   workflow again. It is the same address as `TELEMETRY_URL`.
+4. Open it and sign in with the admin email and password. Until the app reports,
+   every number reads 0.
+
+The Worker's own address (`https://<your-worker>.workers.dev/`) forwards here, so
+an old bookmark still lands on the dashboard.
+
+**How the sign-in travels.** Pages on `github.io` and the Worker on `workers.dev`
+are different sites, so a cookie cannot carry the session between them — browsers
+drop third-party cookies. Instead the page asks `POST /v1/login` for a signed
+session and sends it as an `Authorization` header. The password is only ever
+checked by the Worker, the session stays in that tab, and nothing goes in the
+address bar.
+
+**If the workflow fails at "Set up Pages"**, the repository is private: GitHub
+Pages on a private repository needs a paid plan. Either make the repository
+public or keep administering through `curl` (above).
+
+**Signing out** forgets the session in that tab. A signed session cannot be
+called back before it expires — that is what makes it stateless — so if one ever
+leaks, set a new `SESSION_SECRET` (Workers & Pages → your Worker → Settings →
+Variables and Secrets) and every session ends at once.
+
+## 8. Point the app at it (GitHub, one field)
+
+1. Open <https://github.com/vikkiRoy899/m.calculator/settings/secrets/actions>
 2. **New repository secret**
    * **Name:** `TELEMETRY_URL`
    * **Secret:** your Worker URL, `https://ai-calculator-stats.<your-subdomain>.workers.dev`
@@ -157,12 +228,12 @@ Notes:
 While you are on that page, remove or leave empty anything you do not want: with
 no `TELEMETRY_URL`, the app simply keeps its counters on the phone.
 
-## 8. Get an APK that reports
+## 9. Get an APK that reports
 
-1. Open <https://github.com/vikashtechnology/m.calculator/actions/workflows/android.yml>
+1. Open <https://github.com/vikkiRoy899/m.calculator/actions/workflows/android.yml>
 2. Select **Run workflow** → **Run workflow** (branch: `main`).
 3. When the run finishes, the fresh APK is on
-   <https://github.com/vikashtechnology/m.calculator/releases/tag/latest-build>
+   <https://github.com/vikkiRoy899/m.calculator/releases/tag/latest-build>
 4. Install it, open the app, and make sure **☰ → Anonymous usage stats** is on.
    Use the calculator a little, then reload the dashboard: the numbers appear
    within a minute (the app uploads in the background).
@@ -178,13 +249,14 @@ accounts ever leave the device.
 
 Once the Worker exists, new versions can deploy on their own whenever
 `admin/worker` changes. Add these to
-<https://github.com/vikashtechnology/m.calculator/settings/secrets/actions>:
+<https://github.com/vikkiRoy899/m.calculator/settings/secrets/actions>:
 
 | Kind | Name | Where to find it |
 | --- | --- | --- |
 | Secret | `CLOUDFLARE_API_TOKEN` | Cloudflare → **My Profile → API Tokens → Create Token → Edit Cloudflare Workers** |
 | Secret | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → **Workers & Pages** → *Account ID* in the sidebar |
-| Secret | `ADMIN_TOKEN` | the password from step 5 |
+| Secret | `ADMIN_EMAIL` | the address that signs in (default `rajkatrina90@gmail.com`) |
+| Secret | `ADMIN_PASSWORD_HASH` | from `node admin/worker/hash-password.mjs '…'` |
 | Variable | `D1_DATABASE_ID` | D1 → `m_calculator_stats` → the **Database ID** (a UUID) |
 
 Then the **Dashboard worker** workflow (Actions tab) deploys and runs the health
@@ -195,5 +267,5 @@ it never fails a run for being unconfigured.
 
 If you ever prefer the command line, `admin/worker/setup.sh` does all of the
 above in one command (login, create the database, write `wrangler.toml`, create
-the tables, store the token, deploy, health check) — see
+the tables, store the sign-in, deploy, health check) — see
 [`README.md`](README.md). Both paths deploy the same Worker.

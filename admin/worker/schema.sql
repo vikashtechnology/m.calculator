@@ -38,3 +38,11 @@ CREATE TABLE IF NOT EXISTS about (
   json    TEXT NOT NULL,      -- { title, tagline, body[], links[], contact }
   updated INTEGER NOT NULL
 );
+
+-- One row per setting the Worker must remember between requests. Today that is
+-- only the key that signs admin sessions, generated on first use so no secret
+-- has to be configured by hand.
+CREATE TABLE IF NOT EXISTS settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
