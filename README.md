@@ -19,8 +19,8 @@ handles real and complex numbers, matrices, calculus, units and statistics.
 2. On the phone, tap the downloaded file and allow *Install unknown apps* for your
    browser or file manager when Android asks.
 3. Alternatively, open the **Actions** tab, pick the newest green *Android CI* run
-   and download the `m-calculator-apk` artifact (contains both the debug and
-   release APKs).
+   and download the `m-calculator-build` artifact (contains the debug and release
+   APKs plus the Play bundle).
 
 Requirements: Android 7.0 (API 24) or newer. The maths always runs offline —
 the only two things that touch the network are **Ask AI** (your own key) and the
@@ -157,45 +157,24 @@ Permissions, and what they are for:
 | `RECORD_AUDIO` | Dictating a question. The phone's own speech recogniser turns speech into text; the app records nothing and keeps no audio. |
 | `POST_NOTIFICATIONS` | The "your answer is ready" notification (Android 13+), requested when Ask AI opens. |
 
-Optional build properties:
+Optional build property:
 
 ```bash
--PtelemetryUrl=…        # the Cloudflare Worker that counts anonymous usage
 -PversionCode=…         # the versionCode Play wants for an upload
 ```
 
-### Usage dashboard (optional)
-`admin/worker` holds a Cloudflare Worker that serves a small read-only dashboard:
-installs, active users (today / week / range) and calculations and AI questions
-per day, with a per-day table and chart. One D1 database, no other service, and
-the whole setup is one command:
+## About and donations
 
-There are two ways to set it up: entirely in the Cloudflare dashboard — see
-[`admin/WEB_SETUP.md`](admin/WEB_SETUP.md), where the Worker even creates its own
-tables — or from a terminal with one command:
+**☰ → About AI Calculator** uses content bundled in the Android app. It does
+not sign in, contact a backend, fetch remote configuration, or make a network
+request to display About or donation details. The donation QR is generated
+locally from the same UPI payment URI used by **Open a UPI app**. It includes the
+app logo, and the screen also offers **Copy UPI ID**. The bundled payee is
+**AI Calculator** (`vikashraoa2343-1@oksbi`).
 
-```bash
-cd admin/worker && ./setup.sh        # creates the database, deploys, prints the URL
-```
-
-Then add the printed URL as the repository secret `TELEMETRY_URL` and the next
-build reports counts. `…/health` lists what is configured; see
-[`admin/README.md`](admin/README.md) for the details and the optional
-auto-deploy workflow.
-
-The app sends only aggregate counts (app opens, calculations, AI questions) with
-a random per-install id: no expressions, results, files or accounts. The switch
-*Anonymous usage stats* in the drop-down menu turns it off, and builds without a
-`TELEMETRY_URL` never send anything at all.
-
-## About page, edited from the dashboard
-
-**☰ → About AI Calculator** shows the app icon, the version, and text that comes
-from the stats Worker (`GET /v1/about`) — the same dashboard has a panel that
-saves it (`PUT /v1/about`, admin token), so the wording, the paragraphs and the
-links change without a new APK. The last copy that arrived is kept on the phone,
-so the page works offline; with nothing saved yet it shows the bundled text.
-`admin/WEB_SETUP.md` walks through editing it.
+No anonymous usage telemetry is collected or sent. The calculator and About
+content work offline; Ask AI and advertising may use their providers when those
+features are used.
 
 ## What the calculator shows when it opens
 
@@ -281,7 +260,6 @@ targetSdk 36, minSdk 24. (Kotlin 2.4 is not optional: the AdMob SDKs carry Kotli
 Optional build properties (all safe to leave out):
 
 ```bash
--PtelemetryUrl=…        # sends anonymous usage counts to the admin dashboard
 -PversionCode=…         # the versionCode Play wants for an upload
 -PadmobAppId=…          # override the AdMob app ID from gradle.properties
 -PadmobBannerUnitId=…   # override the banner unit ID
@@ -294,7 +272,7 @@ app/src/main/java/com/advanceai/calculator/
 ├── engine/          pure Kotlin math: lexer, parser, evaluator, complex,
 │                    matrix, calculus, units, formatter (no Android imports)
 ├── data/            SharedPreferences store for settings, variables, history,
-│                    the user's own API key and the anonymous usage counters
+│                    the user's own API key and local preferences/history
 ├── ai/              the chat state, the OpenAI-compatible client, dictation,
 │                    image shrinking and the answer notification
 ├── ui/              Compose UI: view model, keypads, sheets, theme
@@ -302,7 +280,6 @@ app/src/main/java/com/advanceai/calculator/
 │   └── screens/     pad, graph, solver, matrix, units, stats, Ask AI, everyday tools
 └── MainActivity.kt
 app/signing/         the key every build is signed with + its fingerprints
-admin/worker/        the Cloudflare Worker that serves the usage dashboard
 app/src/test/        JUnit suite for the engine
 tools/               icon generator and the Python reference oracle
 ```
@@ -311,7 +288,9 @@ tools/               icon generator and the Python reference oracle
 
 `app/src/test` contains golden-value tests for precedence, implicit
 multiplication, angle modes, complex arithmetic, matrices, calculus, unit
-conversion and the error messages. Expected strings come from `tools/reference.py`,
+conversion and the error messages. Donation regression tests verify the bundled
+UPI payment URI and decode the locally generated QR with its centered logo
+clearance. Expected math strings come from `tools/reference.py`,
 which re-computes every case with Python's `math` module using the same rounding
 rules as `Formatter`.
 
@@ -355,8 +334,8 @@ target Android 16 (API 36) since 31 August 2026. The store listing text, icon,
 feature graphic, screenshots, the data-safety answers, the signing-key decision
 and the version-bumping flow are all written out in [`PLAY.md`](PLAY.md). The
 Play icon (512×512), feature graphic (1024×500) and three phone screenshots come
-from `tools/make_icons.py`, and the privacy policy Play asks for is served by the
-admin Worker at `/privacy`.
+from `tools/make_icons.py`, and the privacy policy Play asks for must be published at a public URL you
+control; see [`PLAY.md`](PLAY.md) for a local-only privacy policy template.
 
 ## Colours and themes
 

@@ -31,7 +31,6 @@ android {
     // stable (Google Sign-In registration and Play upload both care about that).
     // Its SHA-1 is in app/signing/fingerprints.txt.
     val bundledKeystore = rootProject.file("app/signing/mcalculator.p12")
-    val telemetryUrl: String = (findProperty("telemetryUrl") as String?) ?: ""
     // AdMob: the publisher's own IDs when gradle.properties carries them,
     // Google's test IDs otherwise.
     val admobAppId: String = (findProperty("admobAppId") as String?) ?: testAdmobAppId
@@ -52,9 +51,6 @@ android {
         // though the ads SDK itself is given it programmatically; both come
         // from this one value so they cannot drift apart.
         manifestPlaceholders["admobAppId"] = admobAppId
-        // Where the anonymous usage counts go (the Cloudflare Worker in
-        // admin/worker). Empty = the counters are never sent anywhere.
-        buildConfigField("String", "TELEMETRY_URL", "\"$telemetryUrl\"")
         // AdMob IDs the ads code reads at runtime.
         buildConfigField("String", "ADMOB_APP_ID", "\"$admobAppId\"")
         buildConfigField("String", "ADMOB_BANNER_UNIT_ID", "\"$admobBannerUnitId\"")
@@ -165,5 +161,8 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 
+    implementation("com.google.zxing:core:3.5.3")
+
     testImplementation("junit:junit:4.13.2")
+    testImplementation("com.google.zxing:core:3.5.3")
 }

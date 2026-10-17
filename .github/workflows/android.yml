@@ -55,21 +55,10 @@ jobs:
       - name: Check the theme
         run: python3 tools/check_theme.py
 
-      - name: Check the dashboard worker
-        run: |
-          if command -v node >/dev/null 2>&1; then
-            ./tools/run_worker_tests.sh
-          else
-            echo "node is not available; skipping the worker checks"
-          fi
-
       - name: Build debug and release APKs, and the Play bundle
         id: apk
         continue-on-error: true
         env:
-          # Optional: the Cloudflare Worker URL from admin/worker. Without it the
-          # anonymous usage counters stay on the device.
-          TELEMETRY_URL: ${{ secrets.TELEMETRY_URL }}
           # Optional: bump this before each Play upload (Play rejects a repeated
           # versionCode). Settings → Secrets and variables → Actions → Variables.
           PLAY_VERSION_CODE: ${{ vars.PLAY_VERSION_CODE }}
@@ -78,12 +67,6 @@ jobs:
           GRADLE_ARGS=""
           echo "Ask AI: each user pastes their own free key in the app (Groq by"
           echo "default), so no credential is compiled into this APK."
-          if [ -n "$TELEMETRY_URL" ]; then
-            GRADLE_ARGS="$GRADLE_ARGS -PtelemetryUrl=$TELEMETRY_URL"
-            echo "Usage stats: enabled ($TELEMETRY_URL)"
-          else
-            echo "Usage stats: off (no TELEMETRY_URL secret)"
-          fi
           if [ -n "$PLAY_VERSION_CODE" ]; then
             GRADLE_ARGS="$GRADLE_ARGS -PversionCode=$PLAY_VERSION_CODE"
             echo "Play versionCode: $PLAY_VERSION_CODE"

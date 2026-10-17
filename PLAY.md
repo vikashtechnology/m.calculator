@@ -22,16 +22,15 @@ Locally, the same file comes from:
 
 ## Public or private repository — what actually changes
 
-Nothing in the app, the admin Worker, or the Play upload depends on the
-repository being public. Three things do change:
+Neither the Android app nor the Play upload depends on the repository being public. Three things do change:
 
 | | Public (today) | Private |
 | --- | --- | --- |
 | **CI minutes** | unlimited and free | Free plan: 2,000 Linux minutes/month, then $0.006/min or runs are blocked at a $0 spend limit. A build here takes ~4½ minutes, so the free allowance is roughly **440 builds a month** |
 | **Release downloads** | `latest-build` links work for anyone, no login | links need a GitHub login, so **testers cannot install the APK by URL** |
-| **File links** (raw `worker.js`, this file) | open in any browser | need login (fine for you, not for a shared link) |
+| **File links** (this file) | open in any browser | need login (fine for you, not for a shared link) |
 | **The bundled signing key** | visible to everyone | hidden — but it is already in the git history, so make a fresh upload key for Play either way (see above) |
-| Play Console, Cloudflare Worker, app behaviour | — | unchanged |
+| Play Console and app behaviour | — | unchanged |
 
 So the only real consequence is **how testers get the app**. Two ways to keep
 that working after switching to private:
@@ -42,11 +41,10 @@ that working after switching to private:
    needed, and it works for the APK-side too because Play ships the `.aab`.
 2. **Or keep an APK link alive** by publishing builds to a second, always-public
    repository (for example `m.calculator-releases`) from this workflow, or by
-   uploading the APK to Cloudflare R2 / any file host and sharing that URL.
+   uploading the APK to any public file host and sharing that URL.
 
 To switch: **Settings → General → Danger zone → Change repository visibility**.
-Everything under `admin/` keeps deploying exactly as before — the worker workflow
-runs inside whichever repository it lives in.
+The Android build and release workflow remains in this repository. There are no admin deployment workflows.
 
 ## Copy-paste kit
 
@@ -87,7 +85,7 @@ Where the link comes from: Play Console → **Testing → Closed testing → Tes
 **"How testers join your test"** link.
 
 **Support email** — needed on the listing and in the privacy policy. Put the same
-address into `CONTACT` at the top of `admin/worker/worker.js`.
+use it in the privacy policy you publish at a public URL you control.
 
 **App category / tags** — *Tools* is the honest category; tags: Calculator,
 Utilities, Education.
@@ -176,16 +174,40 @@ Suggested text:
   > never sees your calculations, and where the law requires a choice the app
   > asks for consent before the first ad is requested.
   >
-  > Anonymous usage counts can be switched off in the menu, and nothing is sent
-  > while they are off.
+  > The calculator, About content, settings and donation QR are local to your
+  > device. The app does not use accounts or anonymous usage telemetry. Ask AI
+  > sends your prompt and any chosen attachment to the AI provider you select;
+  > advertising may contact Google when ads are enabled.
 
-* **Privacy policy URL** — the Worker from `admin/worker` already serves one:
+* **Privacy policy URL** — publish the policy below as a public page on a domain
+  or static site you control, then paste that stable URL into Play Console. This
+  repository does not host or fetch the policy. Do not use a removed backend URL.
 
-  ``https://<your-worker>.workers.dev/privacy``
+  **Privacy policy text (edit the contact before publishing):**
 
-  Before publishing, open `admin/worker/worker.js`, set `CONTACT` at the top to
-  the support email you use on the listing, and redeploy (paste and Deploy in
-  Cloudflare — see [`WEB_SETUP.md`](WEB_SETUP.md)).
+  > AI Calculator works without an account. Calculator data, settings, About
+  > information and donation details are stored or generated on your device; the
+  > app does not send calculator expressions, history, settings, About content,
+  > donation preferences, or usage telemetry to the publisher. Core calculations
+  > work offline. If you choose Ask AI, your prompt and any attachment are sent
+  > to the AI service selected in the app, under that provider's privacy terms.
+  > If ads are enabled, the Google Mobile Ads SDK may process device or ad
+  > information to provide and measure ads; consent controls are shown where
+  > required. Camera and microphone access are used only for the Ask AI features
+  > you invoke. The app has no publisher-operated account or backend service.
+  > Contact: [replace with your support email].
+
+## Manual cleanup of previously deployed services
+
+This source change removes the admin/backend code and its deployment workflows;
+it does **not** reach into or delete services already deployed in cloud accounts.
+If you previously set these up, the owner should manually review and remove them
+in the relevant provider consoles: the old Cloudflare Worker and D1 database,
+any Telegram bot/webhook and associated bot token, and obsolete GitHub Actions
+secrets/variables (`TELEMETRY_URL`, `CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID`, `ADMIN_TOKEN`, `D1_DATABASE_ID`, or any Telegram bot
+token you configured) or Pages deployments. First export anything you need to retain.
+No cloud resource is deleted automatically by this repository or its Android CI.
 
 ## The ad units (AdMob)
 
@@ -297,17 +319,15 @@ what the code actually does:
 
 | Question | Answer |
 | --- | --- |
-| Does your app collect or share any required user data types? | **Yes** |
-| **App activity → App interactions** | Collected, not shared, **optional** (the user can turn the counters off), used for Analytics |
-| **Device or other IDs** | Collected (a random install id made on the phone, not an Android ID), not shared, optional, used for Analytics |
-| **Photos** | Shared **only** when the user attaches one to an Ask AI question — with the AI service the user's own key belongs to (Groq by default), for App functionality. Not stored by the app |
-| **Voice** | Ask AI can dictate a question using the phone's own speech recogniser. The app records nothing and keeps no audio |
-| **Files and docs** | Same as photos, for PDFs and text attachments |
-| Location, personal info, financial info, messages, contacts, health | **Not collected** |
-| Is data encrypted in transit? | **Yes** (HTTPS only) |
-| Can users request deletion? | **Yes** — contact email, or turn the counters off in the app |
-| **Device or other IDs → Advertising ID** | Collected by Google's Mobile Ads SDK when an ad loads, shared with Google for Advertising or marketing. Present in the ad-supported build only |
-| Is data sold or used for advertising? | **Yes** — the ad SDK uses the advertising ID to serve and measure ads. Nothing the user types, calculates or asks is ever used for advertising, and the maths stays offline |
+| Does your app collect or share any required user data types? | **Yes** (third-party AI and advertising services; declare the current SDK behavior in Play Console) |
+| **App activity / anonymous usage counters** | The app does not collect or send app-open, calculation or AI-question counters, and has no analytics toggle or install ID. Review Google Mobile Ads SDK disclosures separately for any SDK-collected app interactions or diagnostics. |
+| **Photos and files** | Sent to the AI provider selected by the user **only when attached to an Ask AI request**; the app does not keep a chat history or store the attachments. The provider's terms apply. |
+| **Voice** | Dictation uses the phone's speech recognizer. The app does not record or retain audio; verify the recognizer's own disclosure. |
+| **Device or other IDs → Advertising ID** | Google's Mobile Ads SDK may collect device/ad identifiers and related diagnostics when ads are requested; declare the SDK's current collection and sharing in Play Console. Present only in the ad-supported build. |
+| Location, personal info, financial info, messages, contacts, health | Not requested by the app; users may include personal information in an AI prompt or attachment. |
+| Is data encrypted in transit? | **Yes** for AI-provider and Google ad requests (HTTPS). |
+| Can users request deletion? | The app has no account or publisher-held server data. Local app data can be cleared from Android settings; deletion of data held by an AI or ad provider follows that provider's process. |
+| Is data sold or used for advertising? | Google may use ad-related identifiers and signals to provide or measure ads. Calculator expressions are not sent to the ad SDK by the app. |
 
 Content rating: answer the questionnaire honestly — a general-purpose
 calculator is "Everyone". Declare **contains ads** (AdMob banners) and **no

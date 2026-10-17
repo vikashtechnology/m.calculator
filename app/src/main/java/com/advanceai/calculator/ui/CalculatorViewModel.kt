@@ -8,7 +8,6 @@ import androidx.lifecycle.AndroidViewModel
 import com.advanceai.calculator.data.HistoryEntry
 import com.advanceai.calculator.data.AppSettings
 import com.advanceai.calculator.data.Prefs
-import com.advanceai.calculator.data.Telemetry
 import com.advanceai.calculator.data.UserKeys
 import com.advanceai.calculator.engine.AngleMode
 import com.advanceai.calculator.engine.CalculatorEngine
@@ -123,12 +122,11 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = Prefs(app)
 
     init {
-        Telemetry.install(app)
+        // Purge the obsolete anonymous-counter preferences left by earlier builds.
+        app.deleteSharedPreferences("m_calculator_stats")
         // The Gemini keys an older version stored can never work with the
         // providers the app uses now; clear them so nothing misleading remains.
         UserKeys.forgetLegacyKeys(app)
-        // One anonymous count per app start; the results stay on the phone.
-        Telemetry.record(app, Telemetry.EVENT_APP_OPEN)
     }
 
     /**
@@ -413,7 +411,6 @@ class CalculatorViewModel(app: Application) : AndroidViewModel(app) {
                     ans = result.value
                 )
                 prefs.saveHistory(history)
-                Telemetry.record(appContext, Telemetry.EVENT_CALC)
             }
             is EngineResult.Err -> {
                 ui = ui.copy(
